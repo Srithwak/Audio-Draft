@@ -5,7 +5,7 @@ echo ============================================
 echo.
 
 :: Step 1: Prompt for PostgreSQL password and create .env
-echo [1/4] Configuring database credentials...
+echo [1/3] Configuring database credentials...
 set /p DB_PASS="Enter your PostgreSQL password: "
 
 (
@@ -20,19 +20,12 @@ echo       .env file created.
 echo.
 
 :: Step 2: Install Python dependencies
-echo [2/4] Installing Python dependencies...
+echo [2/3] Installing Python dependencies...
 pip install -r requirements.txt
 echo.
 
-:: Step 3: Initialize database and run schema
-echo [3/4] Setting up database...
-python init_db.py
-echo.
-
-:: Step 4: Start the application
-echo [4/4] Starting Audio-Draft...
-echo       Opening http://localhost:5000 in your browser...
-start http://localhost:5000
-python backend/app.py
+:: Step 3: Launch the desktop application
+echo [3/3] Launching Audio-Draft...
+python desktop_app.py
 
 pause

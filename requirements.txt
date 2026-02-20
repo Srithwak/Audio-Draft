@@ -3,3 +3,4 @@ bcrypt
 python-dotenv
 flask
 flask-cors
+flaskwebgui
