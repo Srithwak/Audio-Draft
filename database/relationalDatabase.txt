@@ -1,0 +1,105 @@
+System Database Tables & Relationships
+
+Users
+- user_id: UUID (PK)
+- username: VARCHAR(255)
+- email: VARCHAR(255)
+- password_hash: VARCHAR(255)
+- theme_pref: VARCHAR(50)
+- created_at: TIMESTAMP
+
+Songs
+- song_id: UUID (PK)
+- title: VARCHAR(255)
+- artist: VARCHAR(255)
+- album: VARCHAR(255)
+- genre: VARCHAR(100)
+- duration_ms: INTEGER
+- spotify_uri: VARCHAR(255)
+
+Audio_Features
+- feature_id: UUID (PK)
+- song_id: UUID (FK) -> Songs.song_id
+- tempo: FLOAT
+- energy: FLOAT
+- key: INTEGER
+- valence: FLOAT
+- danceability: FLOAT
+- acousticness: FLOAT
+
+Mood_Tags
+- tag_id: UUID (PK)
+- song_id: UUID (FK) -> Songs.song_id
+- user_id: UUID (FK) -> Users.user_id
+- label: VARCHAR(50)
+- created_at: TIMESTAMP
+
+Playlists
+- playlist_id: UUID (PK)
+- creator_id: UUID (FK) -> Users.user_id
+- name: VARCHAR(255)
+- description: TEXT
+- is_collaborative: BOOLEAN
+- created_at: TIMESTAMP
+- updated_at: TIMESTAMP
+
+Playlist_Versions
+- version_id: UUID (PK)
+- playlist_id: UUID (FK) -> Playlists.playlist_id
+- snapshot_date: TIMESTAMP
+- label: VARCHAR(100)
+
+Playlist_Songs
+- mapping_id: UUID (PK)
+- version_id: UUID (FK) -> Playlist_Versions.version_id
+- song_id: UUID (FK) -> Songs.song_id
+- position: INTEGER
+- added_by: UUID (FK) -> Users.user_id
+- added_at: TIMESTAMP
+
+Collaborators
+- collab_id: UUID (PK)
+- playlist_id: UUID (FK) -> Playlists.playlist_id
+- user_id: UUID (FK) -> Users.user_id
+- permission_level: VARCHAR(50)
+- joined_at: TIMESTAMP
+
+Listening_History
+- listen_id: UUID (PK)
+- user_id: UUID (FK) -> Users.user_id
+- song_id: UUID (FK) -> Songs.song_id
+- played_at: TIMESTAMP
+- skipped: BOOLEAN
+- completion_pct: FLOAT
+
+User_Analytics
+- analytics_id: UUID (PK)
+- user_id: UUID (FK) -> Users.user_id
+- top_genre: VARCHAR(100)
+- total_playtime: BIGINT
+- timeframe: VARCHAR(50)
+- recorded_at: TIMESTAMP
+
+Notifications
+- notification_id: UUID (PK)
+- user_id: UUID (FK) -> Users.user_id
+- type: VARCHAR(100)
+- message: TEXT
+- is_read: BOOLEAN
+- created_at: TIMESTAMP
+- related_id: UUID
+
+Song_Popularity
+- popularity_id: UUID (PK)
+- song_id: UUID (FK) -> Songs.song_id
+- play_count: BIGINT
+- trending_score: FLOAT
+- recorded_at: TIMESTAMP
+
+Playlist_Exports
+- export_id: UUID (PK)
+- playlist_id: UUID (FK) -> Playlists.playlist_id
+- user_id: UUID (FK) -> Users.user_id
+- spotify_playlist_id: VARCHAR(255)
+- exported_at: TIMESTAMP
+- status: VARCHAR(50)

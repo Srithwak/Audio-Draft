@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio-Draft</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <h1>Audio-Draft</h1>
+    <p id="userStatus"></p>
+
+    <!-- Auth Section -->
+    <div id="authSection">
+        <h2>Register</h2>
+        <form id="registerForm">
+            <input type="text" id="regUsername" placeholder="Username" required><br>
+            <input type="email" id="regEmail" placeholder="Email" required><br>
+            <input type="password" id="regPassword" placeholder="Password" required><br>
+            <button type="submit">Register</button>
+        </form>
+
+        <h2>Login</h2>
+        <form id="loginForm">
+            <input type="email" id="loginEmail" placeholder="Email" required><br>
+            <input type="password" id="loginPassword" placeholder="Password" required><br>
+            <button type="submit">Login</button>
+        </form>
+
+        <p id="authMessage"></p>
+    </div>
+
+    <!-- Dashboard Section (hidden until login) -->
+    <div id="dashboard" style="display:none;">
+        <button id="logoutBtn">Logout</button>
+        <h2>Songs</h2>
+        <table id="songTable" border="1" cellpadding="5">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Artist</th>
+                    <th>Album</th>
+                    <th>Genre</th>
+                    <th>Duration</th>
+                </tr>
+            </thead>
+            <tbody id="songBody"></tbody>
+        </table>
+        <p id="noSongs" style="display:none;">No songs in database.</p>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
