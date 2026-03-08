@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Social — Audio-Draft2">
+    <title>Social — Audio-Draft2</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .layout {
+            display: flex;
+            min-height: 100vh;
+            background-color: var(--bg-primary);
+        }
+
+        .sidebar {
+            width: 250px;
+            background-color: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 24px 0;
+        }
+
+        .sidebar__logo {
+            padding: 0 24px 32px 24px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sidebar__nav {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .sidebar__link {
+            padding: 12px 24px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s, background-color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sidebar__link:hover,
+        .sidebar__link.active {
+            color: var(--text-primary);
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .sidebar__link.active {
+            border-right: 3px solid var(--accent-purple);
+        }
+
+        .sidebar__footer {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--gradient-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+        }
+
+        .main-view {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .topbar {
+            height: 72px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 48px;
+            background-color: rgba(13, 13, 18, 0.8);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .page-content {
+            padding: 48px;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .social-section {
+            margin-bottom: 48px;
+        }
+
+        .search-box {
+            margin-bottom: 32px;
+            background: var(--bg-secondary);
+            padding: 24px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .user-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+
+        .friend-item,
+        .request-item {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="sidebar__logo">
+                <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+                    <circle cx="24" cy="24" r="22" stroke="var(--accent-purple)" stroke-width="2" />
+                    <circle cx="24" cy="24" r="10" fill="var(--accent-purple)" />
+                </svg>
+                Audio-Draft2
+            </div>
+            <nav class="sidebar__nav">
+                <a href="dashboard.html" class="sidebar__link">Dashboard</a>
+                <a href="social.html" class="sidebar__link active">Social</a>
+                <a href="playlists.html" class="sidebar__link">Playlists</a>
+                <a href="analytics.html" class="sidebar__link">Analytics</a>
+                <a href="settings.html" class="sidebar__link">Settings</a>
+            </nav>
+            <div class="sidebar__footer">
+                <div class="user-info">
+                    <div class="user-avatar" id="nav-avatar">?</div>
+                    <div id="nav-username" style="font-weight: 600;">Loading...</div>
+                </div>
+                <button class="btn btn--dark" id="logout-btn" style="width: 100%; margin-top: 12px;">Sign Out</button>
+            </div>
+        </aside>
+
+        <main class="main-view">
+            <header class="topbar">
+                <div class="topbar__title">Social</div>
+            </header>
+
+            <div class="page-content">
+                <div class="social-section">
+                    <h2>Find Friends</h2>
+                    <div class="search-box">
+                        <form id="user-search-form" style="display: flex; gap: 12px;">
+                            <input type="text" id="search-query" class="form-input"
+                                placeholder="Search by username or email..." required style="flex: 1;">
+                            <button type="submit" class="btn btn--dark">Search</button>
+                        </form>
+                    </div>
+                    <div id="search-results"></div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px;">
+                    <div class="social-section">
+                        <h2>Friend Requests</h2>
+                        <div id="requests-list">Loading requests...</div>
+                    </div>
+                    <div class="social-section">
+                        <h2>Your Friends</h2>
+                        <div id="friends-list">Loading friends...</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="js/main.js"></script>
+</body>
+
+</html>

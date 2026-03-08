@@ -1,0 +1,366 @@
+Users
+
+user_id: UUID (PK)
+username: VARCHAR(255)
+email: VARCHAR(255)
+password_hash: VARCHAR(255)
+theme_pref: VARCHAR(50)
+created_at: TIMESTAMP
+
+
+User_OAuth_Tokens
+
+token_id: UUID (PK)
+user_id: UUID (FK) -> Users.user_id
+client_id: VARCHAR(255)
+client_secret: VARCHAR(255)
+refresh_token: VARCHAR(255)
+created_at: TIMESTAMP
+updated_at: TIMESTAMP
+
+
+Songs
+
+song_id: UUID (PK)
+title: VARCHAR(255)
+artist: VARCHAR(255)
+album: VARCHAR(255)
+genre: VARCHAR(100)
+duration_ms: INTEGER
+spotify_uri: VARCHAR(255)
+
+
+Audio_Features
+
+feature_id: UUID (PK)
+song_id: UUID (FK) -> Songs.song_id
+tempo: FLOAT
+energy: FLOAT
+key: INTEGER
+valence: FLOAT
+danceability: FLOAT
+acousticness: FLOAT
+instrumentalness: FLOAT
+liveliness: FLOAT
+loudness: FLOAT
+mode: BOOLEAN
+time_signature: INTEGER
+fetched_at: TIMESTAMP
+source: VARCHAR(50)
+
+
+Mood_Tag_Definitions
+
+tag_def_id: INTEGER (PK, SERIAL)
+label: VARCHAR(50)
+description: TEXT
+created_at: TIMESTAMP
+
+
+Mood_Tags
+
+tag_id: UUID (PK)
+song_id: UUID (FK) -> Songs.song_id
+user_id: UUID (FK) -> Users.user_id
+label: INTEGER (FK) -> Mood_Tag_Definitions.tag_def_id
+created_at: TIMESTAMP
+
+
+Playlists
+
+playlist_id: UUID (PK)
+creator_id: UUID (FK) -> Users.user_id
+name: VARCHAR(255)
+description: TEXT
+is_collaborative: BOOLEAN
+created_at: TIMESTAMP
+updated_at: TIMESTAMP
+deleted_at: TIMESTAMP
+
+
+Playlist_Versions
+
+version_id: UUID (PK)
+playlist_id: UUID (FK) -> Playlists.playlist_id
+created_by: UUID (FK) -> Users.user_id
+snapshot_date: TIMESTAMP
+label: VARCHAR(100)
+is_manual: BOOLEAN
+
+
+Playlist_Songs
+
+mapping_id: UUID (PK)
+version_id: UUID (FK) -> Playlist_Versions.version_id
+song_id: UUID (FK) -> Songs.song_id
+position: INTEGER
+added_by: UUID (FK) -> Users.user_id
+added_at: TIMESTAMP
+
+
+Playlist_Collaborators
+
+collab_id: UUID (PK)
+playlist_id: UUID (FK) -> Playlists.playlist_id
+user_id: UUID (FK) -> Users.user_id
+invited_by: UUID (FK) -> Users.user_id
+invite_method: VARCHAR(20) (CHECK IN ('direct', 'link'))
+permission_level: VARCHAR(10) (CHECK IN ('owner', 'editor', 'viewer'))
+joined_at: TIMESTAMP
+
+
+Listening_History
+
+listen_id: UUID (PK)
+user_id: UUID (FK) -> Users.user_id
+song_id: UUID (FK) -> Songs.song_id
+played_at: TIMESTAMP
+skipped: BOOLEAN
+completion_pct: FLOAT
+source_type: VARCHAR(50)
+source_playlist_id: UUID (FK) -> Playlists.playlist_id
+
+
+User_Analytics
+
+analytics_id: UUID (PK)
+user_id: UUID (FK) -> Users.user_id
+top_genre: VARCHAR(100)
+top_artist: VARCHAR(255)
+top_song_id: UUID (FK) -> Songs.song_id
+skip_rate: FLOAT
+total_playtime: BIGINT
+timeframe: VARCHAR(50)
+recorded_at: TIMESTAMP
+
+
+Notifications
+
+notification_id: UUID (PK)
+user_id: UUID (FK) -> Users.user_id
+type: VARCHAR(100)
+message: TEXT
+is_read: BOOLEAN
+created_at: TIMESTAMP
+related_id: UUID
+related_type: VARCHAR(50)
+
+
+Playlist_Exports
+
+export_id: UUID (PK)
+playlist_id: UUID (FK) -> Playlists.playlist_id
+user_id: UUID (FK) -> Users.user_id
+spotify_playlist_id: VARCHAR(255)
+exported_at: TIMESTAMP
+status: VARCHAR(50)
+
+
+Song_Reviews
+
+review_id: UUID (PK)
+song_id: UUID (FK) -> Songs.song_id
+user_id: UUID (FK) -> Users.user_id
+rating: SMALLINT (CHECK 1–5)
+review_text: TEXT
+created_at: TIMESTAMP
+UNIQUE (song_id, user_id)
+
+
+Blocked_Entities
+
+block_id: UUID (PK)
+user_id: UUID (FK) -> Users.user_id
+entity_type: VARCHAR(20) (CHECK IN ('genre', 'artist'))
+entity_value: VARCHAR(255)
+spotify_uri: VARCHAR(255)
+created_at: TIMESTAMP
+UNIQUE (user_id, entity_type, spotify_uri)
+
+Users
+
+user_id: UUID (PK)
+username: VARCHAR(255)
+email: VARCHAR(255)
+password_hash: VARCHAR(255)
+theme_pref: VARCHAR(50)
+created_at: TIMESTAMP
+
+
+User_OAuth_Tokens
+
+token_id: UUID (PK)
+user_id: UUID (FK) -> Users.user_id
+client_id: VARCHAR(255)
+client_secret: VARCHAR(255)
+refresh_token: VARCHAR(255)
+created_at: TIMESTAMP
+updated_at: TIMESTAMP
+
+
+Songs
+
+song_id: UUID (PK)
+title: VARCHAR(255)
+artist: VARCHAR(255)
+album: VARCHAR(255)
+genre: VARCHAR(100)
+duration_ms: INTEGER
+spotify_uri: VARCHAR(255)
+
+
+Audio_Features
+
+feature_id: UUID (PK)
+song_id: UUID (FK) -> Songs.song_id
+tempo: FLOAT
+energy: FLOAT
+key: INTEGER
+valence: FLOAT
+danceability: FLOAT
+acousticness: FLOAT
+instrumentalness: FLOAT
+liveliness: FLOAT
+loudness: FLOAT
+mode: BOOLEAN
+time_signature: INTEGER
+fetched_at: TIMESTAMP
+source: VARCHAR(50)
+
+
+Mood_Tag_Definitions
+
+tag_def_id: INTEGER (PK, SERIAL)
+label: VARCHAR(50)
+description: TEXT
+created_at: TIMESTAMP
+
+
+Mood_Tags
+
+tag_id: UUID (PK)
+song_id: UUID (FK) -> Songs.song_id
+user_id: UUID (FK) -> Users.user_id
+label: INTEGER (FK) -> Mood_Tag_Definitions.tag_def_id
+created_at: TIMESTAMP
+
+
+Playlists
+
+playlist_id: UUID (PK)
+creator_id: UUID (FK) -> Users.user_id
+name: VARCHAR(255)
+description: TEXT
+is_collaborative: BOOLEAN
+created_at: TIMESTAMP
+updated_at: TIMESTAMP
+deleted_at: TIMESTAMP
+
+
+Playlist_Versions
+
+version_id: UUID (PK)
+playlist_id: UUID (FK) -> Playlists.playlist_id
+created_by: UUID (FK) -> Users.user_id
+snapshot_date: TIMESTAMP
+label: VARCHAR(100)
+is_manual: BOOLEAN
+
+
+Playlist_Songs
+
+mapping_id: UUID (PK)
+version_id: UUID (FK) -> Playlist_Versions.version_id
+song_id: UUID (FK) -> Songs.song_id
+position: INTEGER
+added_by: UUID (FK) -> Users.user_id
+added_at: TIMESTAMP
+
+
+Playlist_Collaborators
+
+collab_id: UUID (PK)
+playlist_id: UUID (FK) -> Playlists.playlist_id
+user_id: UUID (FK) -> Users.user_id
+invited_by: UUID (FK) -> Users.user_id
+invite_method: VARCHAR(20) (CHECK IN ('direct', 'link'))
+permission_level: VARCHAR(10) (CHECK IN ('owner', 'editor', 'viewer'))
+joined_at: TIMESTAMP
+
+
+Listening_History
+
+listen_id: UUID (PK)
+user_id: UUID (FK) -> Users.user_id
+song_id: UUID (FK) -> Songs.song_id
+played_at: TIMESTAMP
+skipped: BOOLEAN
+completion_pct: FLOAT
+source_type: VARCHAR(50)
+source_playlist_id: UUID (FK) -> Playlists.playlist_id
+
+
+User_Analytics
+
+analytics_id: UUID (PK)
+user_id: UUID (FK) -> Users.user_id
+top_genre: VARCHAR(100)
+top_artist: VARCHAR(255)
+top_song_id: UUID (FK) -> Songs.song_id
+skip_rate: FLOAT
+total_playtime: BIGINT
+timeframe: VARCHAR(50)
+recorded_at: TIMESTAMP
+
+
+Notifications
+
+notification_id: UUID (PK)
+user_id: UUID (FK) -> Users.user_id
+type: VARCHAR(100)
+message: TEXT
+is_read: BOOLEAN
+created_at: TIMESTAMP
+related_id: UUID
+related_type: VARCHAR(50)
+
+
+Playlist_Exports
+
+export_id: UUID (PK)
+playlist_id: UUID (FK) -> Playlists.playlist_id
+user_id: UUID (FK) -> Users.user_id
+spotify_playlist_id: VARCHAR(255)
+exported_at: TIMESTAMP
+status: VARCHAR(50)
+
+
+Song_Reviews
+
+review_id: UUID (PK)
+song_id: UUID (FK) -> Songs.song_id
+user_id: UUID (FK) -> Users.user_id
+rating: SMALLINT (CHECK 1–5)
+review_text: TEXT
+created_at: TIMESTAMP
+UNIQUE (song_id, user_id)
+
+
+Blocked_Entities
+
+block_id: UUID (PK)
+user_id: UUID (FK) -> Users.user_id
+entity_type: VARCHAR(20) (CHECK IN ('genre', 'artist'))
+entity_value: VARCHAR(255)
+spotify_uri: VARCHAR(255)
+created_at: TIMESTAMP
+UNIQUE (user_id, entity_type, spotify_uri)
+
+Friendships
+
+friend_id: UUID (PK)
+user_id_1: UUID (FK) → Users.user_id
+user_id_2: UUID (FK) → Users.user_id
+requester_id: UUID (FK) → Users.user_id
+status: VARCHAR(20) (CHECK IN ('PENDING', 'ACCEPTED', 'BLOCKED'))
+created_at: TIMESTAMP WITH TIME ZONE

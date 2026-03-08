@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Audio-Draft2 — Music Discovery Platform">
+    <title>Audio-Draft2 — Your Music. Your Insights.</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* Landing page specifics using existing design system variables */
+        .landing-page {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-primary);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .landing-mesh {
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 80% 60% at 20% 80%, rgba(167, 139, 250, 0.15) 0%, transparent 70%),
+                radial-gradient(ellipse 60% 80% at 80% 20%, rgba(129, 140, 248, 0.15) 0%, transparent 70%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .landing-header {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 48px;
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(13, 13, 18, 0.8);
+            backdrop-filter: blur(12px);
+        }
+
+        .landing-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .landing-nav {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .landing-hero {
+            position: relative;
+            z-index: 1;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 64px 24px;
+        }
+
+        .landing-title {
+            font-size: 4rem;
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -0.04em;
+            margin-bottom: 24px;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .landing-subtitle {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin-bottom: 48px;
+            line-height: 1.6;
+        }
+
+        .landing-cta {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+        }
+
+        @media (max-width: 768px) {
+            .landing-title {
+                font-size: 2.5rem;
+            }
+
+            .landing-header {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="landing-page">
+        <div class="landing-mesh"></div>
+
+        <header class="landing-header">
+            <div class="landing-logo">
+                <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
+                    <circle cx="24" cy="24" r="22" stroke="rgba(167, 139, 250, 0.5)" stroke-width="2" />
+                    <circle cx="24" cy="24" r="10" fill="var(--accent-purple)" />
+                    <circle cx="24" cy="24" r="4" fill="#0f172a" />
+                </svg>
+                Audio-Draft2
+            </div>
+            <nav class="landing-nav">
+                <a href="login.html" class="btn" style="color: var(--text-primary);">Log in</a>
+                <a href="register.html" class="btn btn--primary">Sign up</a>
+            </nav>
+        </header>
+
+        <main class="landing-hero">
+            <h1 class="landing-title">Discover your<br>music patterns</h1>
+            <p class="landing-subtitle">Connect your Spotify account and get deep insights into your listening habits,
+                favorite genres, and top artists over time.</p>
+            <div class="landing-cta">
+                <a href="register.html" class="btn btn--primary" style="padding: 16px 32px; font-size: 1.1rem;">Get
+                    Started</a>
+                <a href="login.html" class="btn"
+                    style="padding: 16px 32px; font-size: 1.1rem; border: 1px solid var(--border-color); color: var(--text-primary);">Log
+                    In</a>
+            </div>
+
+            <div class="auth-brand__bars" aria-hidden="true" style="margin-top: 64px;">
+                <span class="bar" style="background: var(--accent-purple);"></span>
+                <span class="bar" style="background: var(--accent-purple);"></span>
+                <span class="bar" style="background: var(--accent-purple);"></span>
+                <span class="bar" style="background: var(--accent-purple);"></span>
+                <span class="bar" style="background: var(--accent-purple);"></span>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/main.js"></script>
+</body>
+
+</html>

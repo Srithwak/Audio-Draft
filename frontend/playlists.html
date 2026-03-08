@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Audio-Draft2 — Playlists">
+    <title>Playlists — Audio-Draft2</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .layout {
+            display: flex;
+            min-height: 100vh;
+            background-color: var(--bg-primary);
+        }
+
+        .sidebar {
+            width: 250px;
+            background-color: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 24px 0;
+        }
+
+        .sidebar__logo {
+            padding: 0 24px 32px 24px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sidebar__nav {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .sidebar__link {
+            padding: 12px 24px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s, background-color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sidebar__link:hover,
+        .sidebar__link.active {
+            color: var(--text-primary);
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .sidebar__link.active {
+            border-right: 3px solid var(--accent-purple);
+        }
+
+        .sidebar__footer {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--gradient-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+        }
+
+        .main-view {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .topbar {
+            height: 72px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 48px;
+            background-color: rgba(13, 13, 18, 0.8);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .page-content {
+            padding: 48px;
+            max-width: 1000px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .playlist-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 24px;
+            margin-top: 32px;
+        }
+
+        .playlist-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s, background-color 0.2s;
+        }
+
+        .playlist-card:hover {
+            transform: translateY(-4px);
+            background-color: rgba(255, 255, 255, 0.03);
+        }
+
+        .playlist-card__title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .playlist-card__meta {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 16px;
+        }
+
+        .playlist-card__actions {
+            margin-top: auto;
+            display: flex;
+            gap: 8px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 16px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar__logo">
+                <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+                    <circle cx="24" cy="24" r="22" stroke="var(--accent-purple)" stroke-width="2" />
+                    <circle cx="24" cy="24" r="10" fill="var(--accent-purple)" />
+                </svg>
+                Audio-Draft2
+            </div>
+
+            <nav class="sidebar__nav">
+                <a href="dashboard.html" class="sidebar__link">Dashboard</a>
+                <a href="social.html" class="sidebar__link">Social</a>
+                <a href="playlists.html" class="sidebar__link active">Playlists</a>
+                <a href="analytics.html" class="sidebar__link">Analytics</a>
+                <a href="settings.html" class="sidebar__link">Settings</a>
+            </nav>
+
+            <div class="sidebar__footer">
+                <div class="user-info">
+                    <div class="user-avatar" id="nav-avatar">?</div>
+                    <div>
+                        <div style="font-weight: 600;" id="nav-username">Loading...</div>
+                    </div>
+                </div>
+                <button class="btn btn--dark" id="logout-btn" style="width: 100%; margin-top: 12px;">Sign Out</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-view">
+            <header class="topbar">
+                <div class="topbar__title">Playlists</div>
+                <div class="topbar__actions">
+                    <a href="notifications.html" class="btn btn--dark">Notifications <span id="notif-badge"
+                            style="background: var(--accent-red); color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.8rem; margin-left: 4px; display: none;">0</span></a>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <div class="dashboard-header"
+                    style="display: flex; justify-content: space-between; align-items: flex-end;">
+                    <div>
+                        <h1 style="font-size: 2rem; margin-bottom: 8px;">Your Library</h1>
+                        <p style="color: var(--text-secondary);">Create, manage, and collaborate on playlists.</p>
+                    </div>
+                    <button class="btn btn--primary" id="open-create-modal">Create Playlist</button>
+                </div>
+
+                <div class="playlist-grid" id="playlists-container">
+                    <div style="color: var(--text-secondary); width: 100%; text-align: center; grid-column: 1 / -1;">
+                        Loading playlists...</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Create Playlist Modal -->
+    <div id="create-modal" class="modal"
+        style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 100; align-items: center; justify-content: center;">
+        <div class="auth-form-panel__inner"
+            style="background: var(--bg-primary); width: 100%; max-width: 500px; padding: 32px; border-radius: 16px; border: 1px solid var(--border-color);">
+            <div class="auth-form-panel__header" style="margin-bottom: 24px;">
+                <h2>Create Playlist</h2>
+            </div>
+            <form id="create-form">
+                <div class="form-group">
+                    <label class="form-label form-label--dark">Title</label>
+                    <input type="text" id="playlist-title" class="form-input form-input--light" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label form-label--dark">Description</label>
+                    <textarea id="playlist-desc" class="form-input form-input--light" rows="3"></textarea>
+                </div>
+                <div style="display: flex; gap: 12px; margin-top: 24px;">
+                    <button type="submit" class="btn btn--primary" style="flex: 1;"
+                        id="submit-create-btn">Create</button>
+                    <button type="button" class="btn btn--dark" id="close-create-modal"
+                        style="flex: 1; background: transparent; border: 1px solid var(--border-color);">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Invite Collaborator Modal -->
+    <div id="invite-modal" class="modal"
+        style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 100; align-items: center; justify-content: center;">
+        <div class="auth-form-panel__inner"
+            style="background: var(--bg-primary); width: 100%; max-width: 500px; padding: 32px; border-radius: 16px; border: 1px solid var(--border-color);">
+            <div class="auth-form-panel__header" style="margin-bottom: 24px;">
+                <h2>Invite Collaborator</h2>
+                <p class="auth-form-panel__subtitle" id="invite-playlist-name">Playlist Name</p>
+            </div>
+            <form id="invite-form">
+                <input type="hidden" id="invite-playlist-id">
+                <div class="form-group">
+                    <label class="form-label form-label--dark">User Email or Username</label>
+                    <input type="text" id="invite-identifier" class="form-input form-input--light"
+                        placeholder="e.g. friend@example.com" required>
+                </div>
+                <div style="display: flex; gap: 12px; margin-top: 24px;">
+                    <button type="submit" class="btn btn--primary" style="flex: 1;" id="submit-invite-btn">Send
+                        Invite</button>
+                    <button type="button" class="btn btn--dark" id="close-invite-modal"
+                        style="flex: 1; background: transparent; border: 1px solid var(--border-color);">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            loadPlaylists();
+
+            // Create Modal Logic
+            const createModal = document.getElementById('create-modal');
+            document.getElementById('open-create-modal').addEventListener('click', () => createModal.style.display = 'flex');
+            document.getElementById('close-create-modal').addEventListener('click', () => createModal.style.display = 'none');
+
+            document.getElementById('create-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn = document.getElementById("submit-create-btn");
+                const name = document.getElementById("playlist-title").value;
+                const description = document.getElementById("playlist-desc").value;
+
+                btn.disabled = true;
+                btn.textContent = "Creating...";
+
+                try {
+                    const res = await apiFetch("/api/playlists", {
+                        method: "POST",
+                        body: JSON.stringify({ name, description })
+                    });
+
+                    const data = await res.json();
+                    if (res.ok) {
+                        createModal.style.display = 'none';
+                        document.getElementById("create-form").reset();
+                        loadPlaylists();
+                    } else {
+                        alert(data.error || "Failed to create playlist");
+                    }
+                } catch (err) {
+                    alert("Network error.");
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = "Create";
+                }
+            });
+
+            // Invite Modal Logic
+            const inviteModal = document.getElementById('invite-modal');
+            document.getElementById('close-invite-modal').addEventListener('click', () => inviteModal.style.display = 'none');
+
+            document.getElementById('invite-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn = document.getElementById("submit-invite-btn");
+                const playlist_id = document.getElementById("invite-playlist-id").value;
+                const identifier = document.getElementById("invite-identifier").value;
+
+                btn.disabled = true;
+                btn.textContent = "Sending...";
+
+                try {
+                    const res = await apiFetch(`/api/playlists/${playlist_id}/invite`, {
+                        method: "POST",
+                        body: JSON.stringify({ identifier })
+                    });
+
+                    const data = await res.json();
+                    if (res.ok) {
+                        alert("Invitation sent successfully!");
+                        inviteModal.style.display = 'none';
+                        document.getElementById("invite-form").reset();
+                        loadPlaylists(); // Refresh state
+                    } else {
+                        alert(data.error || "Failed to send invite");
+                    }
+                } catch (err) {
+                    alert("Network error.");
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = "Send Invite";
+                }
+            });
+        });
+
+        async function loadPlaylists() {
+            const container = document.getElementById("playlists-container");
+
+            try {
+                const res = await apiFetch("/api/playlists");
+                const data = await res.json();
+
+                if (res.ok) {
+                    container.innerHTML = '';
+                    if (data.playlists.length === 0) {
+                        container.innerHTML = '<div style="color: var(--text-secondary); width: 100%; text-align: center; grid-column: 1 / -1; margin-top: 48px;">No playlists found. Create one to get started!</div>';
+                        return;
+                    }
+
+                    data.playlists.forEach(pl => {
+                        const card = document.createElement("div");
+                        card.className = "playlist-card";
+                        card.innerHTML = `
+                            <div class="playlist-card__title">${pl.name}</div>
+                            <div class="playlist-card__meta">${pl.description || "No description"}</div>
+                            <div class="playlist-card__meta" style="font-size: 0.8rem; margin-top: -10px;">${pl.is_collaborative ? '🤝 Collaborative' : '👤 Private'}</div>
+                            
+                            <div class="playlist-card__actions">
+                                <button class="btn btn--dark open-invite-btn" data-id="${pl.playlist_id}" data-name="${pl.name}" style="flex: 1; background: transparent; border: 1px solid var(--border-color);">Invite</button>
+                            </div>
+                        `;
+                        container.appendChild(card);
+                    });
+
+                    // Attach invite modal handlers
+                    document.querySelectorAll(".open-invite-btn").forEach(btn => {
+                        btn.addEventListener("click", (e) => {
+                            const id = e.target.getAttribute("data-id");
+                            const name = e.target.getAttribute("data-name");
+                            document.getElementById("invite-playlist-id").value = id;
+                            document.getElementById("invite-playlist-name").textContent = name;
+                            document.getElementById('invite-modal').style.display = 'flex';
+                        });
+                    });
+                }
+            } catch (err) {
+                container.innerHTML = '<div style="color: var(--accent-red); width: 100%; text-align: center; grid-column: 1 / -1;">Failed to load playlists.</div>';
+            }
+        }
+    </script>
+</body>
+
+</html>

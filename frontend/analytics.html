@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Audio-Draft2 — Profile Analytics">
+    <title>Analytics — Audio-Draft2</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .layout {
+            display: flex;
+            min-height: 100vh;
+            background-color: var(--bg-primary);
+        }
+
+        .sidebar {
+            width: 250px;
+            background-color: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 24px 0;
+        }
+
+        .sidebar__logo {
+            padding: 0 24px 32px 24px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sidebar__nav {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .sidebar__link {
+            padding: 12px 24px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s, background-color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sidebar__link:hover,
+        .sidebar__link.active {
+            color: var(--text-primary);
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .sidebar__link.active {
+            border-right: 3px solid var(--accent-purple);
+        }
+
+        .sidebar__footer {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--gradient-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+        }
+
+        .main-view {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .topbar {
+            height: 72px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 48px;
+            background-color: rgba(13, 13, 18, 0.8);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .page-content {
+            padding: 40px 48px;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* Analytics Specific Styles */
+        .analytics-hero {
+            background: var(--gradient-glow);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            margin-bottom: 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .analytics-hero::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -10%;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(167, 139, 250, 0.1) 0%, transparent 70%);
+            z-index: 0;
+        }
+
+        .hero-text {
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-stats {
+            display: flex;
+            gap: 48px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .timeframe-selector {
+            display: flex;
+            gap: 8px;
+            background: var(--bg-secondary);
+            padding: 4px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+            margin-bottom: 32px;
+            align-self: flex-start;
+        }
+
+        .timeframe-btn {
+            padding: 8px 16px;
+            border: none;
+            background: none;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 600;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .timeframe-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .timeframe-btn.active {
+            background: var(--bg-hover);
+            color: var(--accent-purple);
+        }
+
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 32px;
+        }
+
+        .analytics-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .ranking-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .ranking-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: var(--radius-md);
+            transition: background 0.2s;
+        }
+
+        .ranking-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .ranking-img {
+            width: 48px;
+            height: 48px;
+            border-radius: 4px;
+            object-fit: cover;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .ranking-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .ranking-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .ranking-sub {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: var(--border-color);
+            border-radius: 2px;
+            margin-top: 8px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent-purple);
+            border-radius: 2px;
+        }
+
+        .status-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: rgba(167, 139, 250, 0.1);
+            color: var(--accent-purple);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar__logo">
+                <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+                    <circle cx="24" cy="24" r="22" stroke="var(--accent-purple)" stroke-width="2" />
+                    <circle cx="24" cy="24" r="10" fill="var(--accent-purple)" />
+                </svg>
+                Audio-Draft2
+            </div>
+
+            <nav class="sidebar__nav">
+                <a href="dashboard.html" class="sidebar__link">Dashboard</a>
+                <a href="social.html" class="sidebar__link">Social</a>
+                <a href="playlists.html" class="sidebar__link">Playlists</a>
+                <a href="analytics.html" class="sidebar__link active">Analytics</a>
+                <a href="settings.html" class="sidebar__link">Settings</a>
+            </nav>
+
+            <div class="sidebar__footer">
+                <div class="user-info">
+                    <div class="user-avatar" id="nav-avatar">?</div>
+                    <div>
+                        <div style="font-weight: 600;" id="nav-username">Loading...</div>
+                    </div>
+                </div>
+                <button class="btn btn--dark" id="logout-btn" style="width: 100%; margin-top: 12px;">Sign Out</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-view">
+            <header class="topbar">
+                <div class="topbar__title">Profile Analytics</div>
+                <div class="topbar__actions">
+                    <span class="status-badge" id="spotify-sync-status">Syncing...</span>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <div class="analytics-hero">
+                    <div class="hero-text">
+                        <h1 id="analytics-header">Listening Insights</h1>
+                        <p class="text-secondary">Discover your musical identity across the weeks.</p>
+                    </div>
+                    <div class="hero-stats">
+                        <div class="stat-item">
+                            <span class="stat-value" id="songs-logged">...</span>
+                            <span class="stat-label">Songs</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="total-playtime">...</span>
+                            <span class="stat-label">Playtime</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="top-genre">Pop</span>
+                            <span class="stat-label">Top Genre</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="timeframe-selector">
+                    <button class="timeframe-btn active" data-time="short_term">Recent</button>
+                    <button class="timeframe-btn" data-time="medium_term">6 Months</button>
+                    <button class="timeframe-btn" data-time="long_term">All Time</button>
+                </div>
+
+                <div class="analytics-grid">
+                    <!-- Top Artists -->
+                    <div class="analytics-card">
+                        <div class="card-header">
+                            <h2 class="card-title">Top Artists</h2>
+                        </div>
+                        <div id="top-artists-list" class="ranking-list">
+                            <!-- Loading Items -->
+                            <p class="text-muted">Loading your favorites...</p>
+                        </div>
+                    </div>
+
+                    <!-- Top Tracks -->
+                    <div class="analytics-card">
+                        <div class="card-header">
+                            <h2 class="card-title">Top Tracks</h2>
+                        </div>
+                        <div id="top-tracks-list" class="ranking-list">
+                            <!-- Loading Items -->
+                            <p class="text-muted">Loading your anthems...</p>
+                        </div>
+                    </div>
+
+                    <!-- Recent Activity -->
+                    <div class="analytics-card" style="grid-column: span 2;">
+                        <div class="card-header">
+                            <h2 class="card-title">Recently Played</h2>
+                        </div>
+                        <div id="recent-tracks-list" class="ranking-list">
+                            <!-- Loading Items -->
+                            <p class="text-muted">Fetching recent history...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/main.js"></script>
+</body>
+
+</html>

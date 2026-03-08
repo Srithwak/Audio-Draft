@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Audio-Draft2 — Music Discovery Platform">
+    <title>Create Account — Audio-Draft2</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <main class="main-content">
+        <div class="auth-split">
+            <div class="auth-brand">
+                <div class="auth-brand__mesh"></div>
+                <div class="auth-brand__content">
+                    <div class="auth-brand__logo">
+                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                            <circle cx="24" cy="24" r="22" stroke="rgba(255,255,255,0.3)" stroke-width="2" />
+                            <circle cx="24" cy="24" r="10" fill="rgba(255,255,255,0.9)" />
+                            <circle cx="24" cy="24" r="4" fill="#0f172a" />
+                        </svg>
+                    </div>
+                    <h2 class="auth-brand__name">Audio-Draft2</h2>
+                    <p class="auth-brand__tagline">Discover patterns in your<br>listening habits.</p>
+                    <div class="auth-brand__bars" aria-hidden="true">
+                        <span class="bar"></span>
+                        <span class="bar"></span>
+                        <span class="bar"></span>
+                        <span class="bar"></span>
+                        <span class="bar"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="auth-form-panel">
+                <div class="auth-form-panel__inner">
+                    <div class="auth-form-panel__header">
+                        <h1 class="auth-form-panel__title">Create account</h1>
+                        <p class="auth-form-panel__subtitle">Start discovering music your way</p>
+                    </div>
+                    <form method="POST" action="login.html" class="auth-form" id="register-form" novalidate>
+                        <div class="form-group" id="register-username-group">
+                            <label for="username" class="form-label form-label--dark">Username</label>
+                            <input type="text" name="username" class="form-input form-input--light" id="username"
+                                placeholder="your_username" autocomplete="username" required>
+                        </div>
+                        <div class="form-group" id="register-email-group">
+                            <label for="email" class="form-label form-label--dark">Email</label>
+                            <input type="email" name="email" class="form-input form-input--light" id="email"
+                                placeholder="you@example.com" autocomplete="email" required>
+                        </div>
+                        <div class="form-group" id="register-password-group">
+                            <label for="password" class="form-label form-label--dark">Password</label>
+                            <input type="password" name="password" class="form-input form-input--light" id="password"
+                                placeholder="Minimum 8 characters" autocomplete="new-password" required>
+                        </div>
+                        <div class="form-group" id="register-confirm-group">
+                            <label for="confirm_password" class="form-label form-label--dark">Confirm Password</label>
+                            <input type="password" name="confirm_password" class="form-input form-input--light"
+                                id="confirm_password" placeholder="Re-enter your password" autocomplete="new-password"
+                                required>
+                        </div>
+                        <button type="submit" class="btn btn--dark btn--full" id="register-submit">
+                            Create Account
+                        </button>
+                    </form>
+                    <div class="auth-form-panel__footer">
+                        <p>Already have an account? <a href="login.html" class="auth-link--dark" id="goto-login">Sign
+                                in</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script src="js/main.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Audio-Draft2 — Settings">
+    <title>Settings — Audio-Draft2</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .layout {
+            display: flex;
+            min-height: 100vh;
+            background-color: var(--bg-primary);
+        }
+
+        .sidebar {
+            width: 250px;
+            background-color: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 24px 0;
+        }
+
+        .sidebar__logo {
+            padding: 0 24px 32px 24px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sidebar__nav {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .sidebar__link {
+            padding: 12px 24px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s, background-color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sidebar__link:hover,
+        .sidebar__link.active {
+            color: var(--text-primary);
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .sidebar__link.active {
+            border-right: 3px solid var(--accent-purple);
+        }
+
+        .sidebar__footer {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--gradient-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+        }
+
+        .main-view {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .topbar {
+            height: 72px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 48px;
+            background-color: rgba(13, 13, 18, 0.8);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .page-content {
+            padding: 48px;
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .settings-section {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 32px;
+            margin-bottom: 32px;
+        }
+
+        .settings-section h2 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+
+        .settings-section p {
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+        }
+
+        .block-list {
+            list-style: none;
+            padding: 0;
+            margin-top: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .block-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+
+        .block-item span.badge {
+            font-size: 0.8rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            margin-right: 12px;
+            text-transform: uppercase;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 0.85rem;
+        }
+
+        /* Toggle Switch Wrapper */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        /* Hide default HTML checkbox */
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        /* The slider */
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #334155;
+            transition: .4s;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+        }
+
+        input:checked+.slider {
+            background-color: var(--accent-purple);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(26px);
+        }
+
+        .slider.round {
+            border-radius: 34px;
+        }
+
+        .slider.round:before {
+            border-radius: 50%;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar__logo">
+                <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+                    <circle cx="24" cy="24" r="22" stroke="var(--accent-purple)" stroke-width="2" />
+                    <circle cx="24" cy="24" r="10" fill="var(--accent-purple)" />
+                </svg>
+                Audio-Draft2
+            </div>
+
+            <nav class="sidebar__nav">
+                <a href="dashboard.html" class="sidebar__link">Dashboard</a>
+                <a href="social.html" class="sidebar__link">Social</a>
+                <a href="playlists.html" class="sidebar__link">Playlists</a>
+                <a href="analytics.html" class="sidebar__link">Analytics</a>
+                <a href="settings.html" class="sidebar__link active">Settings</a>
+            </nav>
+
+            <div class="sidebar__footer">
+                <div class="user-info">
+                    <div class="user-avatar" id="nav-avatar">?</div>
+                    <div>
+                        <div style="font-weight: 600;" id="nav-username">Loading...</div>
+                    </div>
+                </div>
+                <button class="btn btn--dark" id="logout-btn" style="width: 100%; margin-top: 12px;">Sign Out</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-view">
+            <header class="topbar">
+                <div class="topbar__title">Settings</div>
+                <div class="topbar__actions">
+                    <a href="notifications.html" class="btn btn--dark">Notifications <span id="notif-badge"
+                            style="background: var(--accent-red); color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.8rem; margin-left: 4px; display: none;">0</span></a>
+                </div>
+            </header>
+
+            <div class="page-content">
+
+                <!-- Spotify API Settings -->
+                <section class="settings-section">
+                    <h2>Spotify Integration</h2>
+                    <p>Connect your Spotify developer app credentials to enable recommendations and deep analytics.</p>
+
+                    <form id="spotify-settings-form" class="settings-form">
+                        <div class="form-group">
+                            <label for="client_id" class="form-label form-label--dark">Spotify Client ID</label>
+                            <input type="text" id="client_id" class="form-input form-input--light"
+                                placeholder="e.g. 32-character hex">
+                        </div>
+                        <div class="form-group">
+                            <label for="client_secret" class="form-label form-label--dark">Spotify Client Secret</label>
+                            <input type="password" id="client_secret" class="form-input form-input--light"
+                                placeholder="e.g. 32-character hex">
+                        </div>
+                        <button type="submit" class="btn btn--primary" id="spotify-save-btn">Save Credentials</button>
+                        <button type="button" class="btn btn--dark" id="connect-spotify-btn"
+                            style="margin-top: 12px; width: 100%; border: 1px solid var(--accent-purple);">Connect
+                            Spotify Account</button>
+                    </form>
+                </section>
+
+                <!-- Appearance Settings -->
+                <section class="settings-section">
+                    <h2>Appearance</h2>
+                    <p>Customize how Audio-Draft2 looks for you.</p>
+
+                    <div
+                        style="display: flex; align-items: center; justify-content: space-between; padding: 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 8px;">
+                        <div>
+                            <div style="font-weight: 600;">Light Mode</div>
+                            <div style="font-size: 0.8125rem; color: var(--text-secondary);">Switch to a bright
+                                interface</div>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="theme-toggle">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                </section>
+
+                <!-- Blocking (Use Case 15) -->
+                <section class="settings-section">
+                    <h2>Content Blocking</h2>
+                    <p>Block specific artists or genres so they don't show up in your recommendations.</p>
+
+                    <form id="block-form" class="settings-form"
+                        style="display: flex; gap: 12px; align-items: flex-end;">
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <label for="block-type" class="form-label form-label--dark">Type</label>
+                            <select id="block-type" class="form-input form-input--light"
+                                style="appearance: auto; height: 50px;">
+                                <option value="artist">Artist</option>
+                                <option value="genre">Genre</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex: 2; margin-bottom: 0;">
+                            <label for="block-name" class="form-label form-label--dark">Name</label>
+                            <input type="text" id="block-name" class="form-input form-input--light"
+                                placeholder="e.g. Country or Taylor Swift" required>
+                        </div>
+                        <button type="submit" class="btn btn--dark" id="block-submit-btn"
+                            style="height: 50px;">Block</button>
+                    </form>
+
+                    <ul class="block-list" id="block-list-container">
+                        <!-- Blocked items injected here -->
+                    </ul>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Required Scripts -->
+    <script src="js/main.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            // Setup Settings forms
+            const spotifyForm = document.getElementById("spotify-settings-form");
+            const blockForm = document.getElementById("block-form");
+
+            if (spotifyForm) {
+                spotifyForm.addEventListener("submit", async (e) => {
+                    e.preventDefault();
+                    const btn = document.getElementById("spotify-save-btn");
+                    const client_id = document.getElementById("client_id").value;
+                    const client_secret = document.getElementById("client_secret").value;
+
+                    // Simple client-side check to mimic main.js format but not restrict it entirely if users paste correctly
+                    btn.disabled = true;
+                    btn.textContent = "Saving...";
+
+                    try {
+                        const res = await apiFetch("/api/settings/spotify", {
+                            method: "POST",
+                            body: JSON.stringify({ client_id, client_secret })
+                        });
+
+                        const data = await res.json();
+                        if (res.ok) {
+                            alert("Spotify credentials saved successfully!");
+                        } else {
+                            alert(data.error || "Failed to save credentials");
+                        }
+                    } catch (err) {
+                        alert("Network error.");
+                    } finally {
+                        btn.disabled = false;
+                        btn.textContent = "Save Credentials";
+                    }
+                });
+            }
+
+            if (blockForm) {
+                loadBlockList();
+
+                blockForm.addEventListener("submit", async (e) => {
+                    e.preventDefault();
+                    const btn = document.getElementById("block-submit-btn");
+                    const entity_type = document.getElementById("block-type").value;
+                    const entity_value = document.getElementById("block-name").value;
+
+                    btn.disabled = true;
+                    btn.textContent = "...";
+
+                    try {
+                        const res = await apiFetch("/api/blocks", {
+                            method: "POST",
+                            body: JSON.stringify({ entity_type, entity_value })
+                        });
+
+                        const data = await res.json();
+                        if (res.ok) {
+                            document.getElementById("block-name").value = "";
+                            loadBlockList();
+                        } else {
+                            alert(data.error || "Failed to add block");
+                        }
+                    } catch (err) {
+                        alert("Network error.");
+                    } finally {
+                        btn.disabled = false;
+                        btn.textContent = "Block";
+                    }
+                });
+            }
+
+            // Theme Toggle Logic
+            const themeToggle = document.getElementById("theme-toggle");
+            if (themeToggle) {
+                // Initial state set by initTheme in main.js will update the checkbox
+                themeToggle.addEventListener("change", (e) => {
+                    const newTheme = e.target.checked ? 'light' : 'dark';
+                    setTheme(newTheme);
+                });
+            }
+        });
+
+        async function loadBlockList() {
+            const container = document.getElementById("block-list-container");
+            container.innerHTML = '<li class="block-item">Loading...</li>';
+
+            try {
+                const res = await apiFetch("/api/blocks");
+                const data = await res.json();
+
+                if (res.ok) {
+                    container.innerHTML = '';
+                    if (data.blocks.length === 0) {
+                        container.innerHTML = '<li class="block-item" style="justify-content: center; color: var(--text-secondary);">No blocked content</li>';
+                        return;
+                    }
+
+                    data.blocks.forEach(block => {
+                        const li = document.createElement("li");
+                        li.className = "block-item";
+                        li.innerHTML = `
+                            <div>
+                                <span class="badge">${block.entity_type}</span>
+                                <strong>${block.entity_value}</strong>
+                            </div>
+                            <button class="btn btn--dark btn-small unblock-btn" data-id="${block.block_id}">Unblock</button>
+                        `;
+                        container.appendChild(li);
+                    });
+
+                    // Attach unblock handlers
+                    document.querySelectorAll(".unblock-btn").forEach(btn => {
+                        btn.addEventListener("click", async (e) => {
+                            const blockId = e.target.getAttribute("data-id");
+                            e.target.disabled = true;
+                            e.target.textContent = "...";
+                            await apiFetch(`/api/blocks/${blockId}`, { method: 'DELETE' });
+                            loadBlockList();
+                        });
+                    });
+                }
+            } catch (err) {
+                container.innerHTML = '<li class="block-item">Failed to load blocks</li>';
+            }
+        }
+    </script>
+</body>
+
+</html>
