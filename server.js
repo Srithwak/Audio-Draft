@@ -486,6 +486,21 @@ app.delete('/api/friends/:id', authenticateUser, async (req, res) => {
     }
 });
 
+app.get('/api/spotify/status', authenticateUser, async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('user_oauth_tokens')
+            .select('client_id')
+            .eq('user_id', req.user.user_id)
+            .maybeSingle();
+
+        if (error) throw error;
+        res.json({ configured: !!data });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // -- Spotify Live Integration --
 app.get('/api/spotify/auth-url', authenticateUser, async (req, res) => {
     try {

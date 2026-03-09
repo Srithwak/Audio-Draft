@@ -82,6 +82,18 @@ async function apiFetch(url, options = {}) {
     return fetch(url, { ...options, headers });
 }
 
+// Check if Spotify credentials are set
+async function checkSpotifyStatus() {
+    try {
+        const res = await apiFetch('/api/spotify/status');
+        const data = await res.json();
+        return !!data.configured;
+    } catch (err) {
+        console.error("Failed to check Spotify status:", err);
+        return false;
+    }
+}
+
 /* ── Theme Management ──────────────────────────────────────────────────────── */
 function initTheme() {
     const savedTheme = localStorage.getItem('audioDraftTheme') || 'dark';
@@ -341,9 +353,17 @@ function clearInputError(input) {
 
 
 /* ── Dashboard & Spotify Live Logic ───────────────────────────────────────── */
-function initDashboard() {
+async function initDashboard() {
     updateNowPlaying();
-    updateTrendingSongs();
+
+    const isConfigured = await checkSpotifyStatus();
+    if (isConfigured) {
+        updateTrendingSongs();
+    } else {
+        const container = document.getElementById('discover-container');
+        if (container) container.innerHTML = '<p class="text-muted">Connect Spotify in Settings to see trending tracks.</p>';
+    }
+
     // Poll every 40 seconds
     setInterval(updateNowPlaying, 40000);
 }
@@ -547,7 +567,14 @@ function initSettings() {
 }
 
 /* ── Analytics Logic ──────────────────────────────────────────────────────── */
-function initAnalytics() {
+async function initAnalytics() {
+    const isConfigured = await checkSpotifyStatus();
+    if (!isConfigured) {
+        const statsGrid = document.querySelector('.stats-grid');
+        if (statsGrid) statsGrid.innerHTML = '<p class="text-muted" style="grid-column: 1/-1; text-align: center; padding: 40px;">Connect Spotify in Settings to view your listening analytics.</p>';
+        return;
+    }
+
     const btns = document.querySelectorAll('.timeframe-btn');
     btns.forEach(btn => {
         btn.addEventListener('click', () => {
