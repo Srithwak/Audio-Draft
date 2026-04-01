@@ -11,7 +11,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <style>
-        .page-content { max-width: 1200px; }
+        .page-content {
+            max-width: 1200px;
+        }
 
         .timeframe-selector {
             display: flex;
@@ -36,8 +38,14 @@
             transition: all 0.2s;
         }
 
-        .timeframe-btn:hover { color: var(--text-primary); }
-        .timeframe-btn.active { background: var(--bg-hover); color: var(--accent-purple); }
+        .timeframe-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .timeframe-btn.active {
+            background: var(--bg-hover);
+            color: var(--accent-purple);
+        }
 
         .analytics-grid {
             display: grid;
@@ -52,7 +60,9 @@
             padding: 24px;
         }
 
-        .analytics-card--full { grid-column: span 2; }
+        .analytics-card--full {
+            grid-column: span 2;
+        }
 
         .card-title {
             font-size: 1rem;
@@ -64,7 +74,11 @@
             font-size: 0.8rem;
         }
 
-        .ranking-list { display: flex; flex-direction: column; gap: 8px; }
+        .ranking-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
 
         .ranking-item {
             display: flex;
@@ -76,7 +90,9 @@
             transition: background 0.2s;
         }
 
-        .ranking-item:hover { background: rgba(255, 255, 255, 0.04); }
+        .ranking-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
 
         .ranking-rank {
             width: 24px;
@@ -93,12 +109,17 @@
             border-radius: 4px;
             object-fit: cover;
             flex-shrink: 0;
-            background: rgba(255,255,255,0.05);
+            background: rgba(255, 255, 255, 0.05);
         }
 
-        .ranking-img--round { border-radius: 50%; }
+        .ranking-img--round {
+            border-radius: 50%;
+        }
 
-        .ranking-info { flex: 1; min-width: 0; }
+        .ranking-info {
+            flex: 1;
+            min-width: 0;
+        }
 
         .ranking-name {
             font-weight: 600;
@@ -122,7 +143,7 @@
             font-size: 0.7rem;
             padding: 2px 8px;
             border-radius: 10px;
-            background: rgba(167,139,250,0.1);
+            background: rgba(167, 139, 250, 0.1);
             color: var(--accent-purple);
             margin-right: 4px;
             margin-top: 4px;
@@ -160,7 +181,9 @@
             text-overflow: ellipsis;
         }
 
-        .stat-card--accent .stat-card__value { color: var(--accent-purple); }
+        .stat-card--accent .stat-card__value {
+            color: var(--accent-purple);
+        }
 
         .empty-state {
             text-align: center;
@@ -190,7 +213,9 @@
             <div class="sidebar__footer">
                 <div class="user-info">
                     <div class="user-avatar" id="nav-avatar">?</div>
-                    <div><div style="font-weight: 600;" id="nav-username">Loading...</div></div>
+                    <div>
+                        <div style="font-weight: 600;" id="nav-username">Loading...</div>
+                    </div>
                 </div>
                 <button class="btn btn--dark" id="logout-btn" style="width: 100%; margin-top: 12px;">Sign Out</button>
             </div>
@@ -200,7 +225,8 @@
             <header class="topbar">
                 <div class="topbar__title">Analytics</div>
                 <div class="topbar__actions">
-                    <span id="spotify-sync-status" style="font-size: 0.8rem; color: var(--text-secondary);">Loading...</span>
+                    <span id="spotify-sync-status"
+                        style="font-size: 0.8rem; color: var(--text-secondary);">Loading...</span>
                 </div>
             </header>
 
@@ -208,6 +234,32 @@
                 <div class="genre-hero">
                     <div class="genre-hero__label">Your Top Genre</div>
                     <div class="genre-hero__value" id="top-genre">...</div>
+                </div>
+
+                <!-- NEW: Profile Analytics Section -->
+                <div class="stats-row" id="profile-stats">
+                    <div class="stat-card">
+                        <div class="stat-card__label">Generated Playlists</div>
+                        <div class="stat-card__value" id="stat-playlists">...</div>
+                    </div>
+                    <div class="stat-card stat-card--accent">
+                        <div class="stat-card__label">Reviews & Ratings</div>
+                        <div class="stat-card__value" id="stat-reviews">...</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__label">Friends</div>
+                        <div class="stat-card__value" id="stat-friends">...</div>
+                    </div>
+                </div>
+                <div class="stats-row" id="profile-stats-2">
+                    <div class="stat-card">
+                        <div class="stat-card__label">Avg Rating Given</div>
+                        <div class="stat-card__value" id="stat-avg-rating">...</div>
+                    </div>
+                    <div class="stat-card stat-card--accent">
+                        <div class="stat-card__label">Spotify Exports</div>
+                        <div class="stat-card__value" id="stat-exports">...</div>
+                    </div>
                 </div>
 
                 <div class="timeframe-selector">

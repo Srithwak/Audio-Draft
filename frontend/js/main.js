@@ -379,7 +379,7 @@ async function updateNowPlaying() {
 
             const deviceIcon = data.device_type === 'smartphone' ? '📱'
                 : data.device_type === 'computer' ? '💻'
-                : data.device_type === 'speaker' ? '🔊' : '🎧';
+                    : data.device_type === 'speaker' ? '🔊' : '🎧';
 
             container.innerHTML = `
                 ${statusBadge}
@@ -479,7 +479,10 @@ async function loadFriendships() {
 
         friendsDiv.innerHTML = accepted.length ? accepted.map(f => {
             const friendName = f.user_id_1 === user.id ? f.user2.username : f.user1.username;
-            return `<div class="friend-item">${sanitize(friendName)}</div>`;
+            return `<div class="friend-item">
+                <span>${sanitize(friendName)}</span>
+                <button class="btn btn--small btn--dark" style="background: var(--accent-red);" onclick="removeFriend('${sanitize(f.friend_id)}')">Remove</button>
+            </div>`;
         }).join('') : '<p>No friends yet.</p>';
 
         requestsDiv.innerHTML = pending.length ? pending.map(f => {
@@ -523,6 +526,18 @@ async function declineFriend(friendId) {
     }
 }
 
+async function removeFriend(friendId) {
+    if (!confirm("Remove this friend?")) return;
+    try {
+        await apiFetch(`/api/friends/${friendId}`, {
+            method: 'DELETE'
+        });
+        loadFriendships();
+    } catch (err) {
+        alert("Failed to remove friend");
+    }
+}
+
 /* ── Settings Specifics ───────────────────────────────────────────────────── */
 function initSettings() {
     const connectBtn = document.getElementById('connect-spotify-btn');
@@ -548,7 +563,7 @@ function initSettings() {
     }
 }
 
-/* ── Analytics Logic (Real Spotify API) ───────────────────────────────────── */
+/* ── Analytics Logic (Real Spotify API + Profile) ─────────────────────────── */
 async function initAnalytics() {
     const btns = document.querySelectorAll('.timeframe-btn');
     btns.forEach(btn => {
@@ -560,6 +575,24 @@ async function initAnalytics() {
     });
 
     loadAnalytics('short_term');
+    loadProfileAnalytics();
+}
+
+async function loadProfileAnalytics() {
+    try {
+        const res = await apiFetch('/api/profile-analytics');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const el = (id) => document.getElementById(id);
+        if (el('stat-playlists')) el('stat-playlists').textContent = data.playlists_count;
+        if (el('stat-reviews')) el('stat-reviews').textContent = data.reviews_count;
+        if (el('stat-friends')) el('stat-friends').textContent = data.friends_count;
+        if (el('stat-avg-rating')) el('stat-avg-rating').textContent = data.average_rating_given ? `${data.average_rating_given} / 5` : 'N/A';
+        if (el('stat-exports')) el('stat-exports').textContent = data.exports_count;
+    } catch (err) {
+        console.error("Failed to load profile analytics", err);
+    }
 }
 
 async function loadAnalytics(timeframe) {

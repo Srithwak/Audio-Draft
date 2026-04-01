@@ -543,7 +543,7 @@ app.get('/api/spotify/auth-url', authenticateUser, async (req, res) => {
         return res.status(400).json({ error: "Spotify Client ID not configured on server" });
     }
 
-    const scope = 'user-read-currently-playing user-read-playback-state user-top-read user-read-recently-played playlist-read-private playlist-read-collaborative';
+    const scope = 'user-read-currently-playing user-read-playback-state user-top-read user-read-recently-played playlist-read-private playlist-read-collaborative playlist-modify-public playlist-modify-private';
     const url = 'https://accounts.spotify.com/authorize?' +
         querystring.stringify({
             response_type: 'code',
@@ -677,7 +677,7 @@ app.get('/api/spotify/playlists/:playlistId/tracks', authenticateUser, async (re
 
         const spotifyRes = await axios.get(`https://api.spotify.com/v1/playlists/${req.params.playlistId}/tracks`, {
             headers: { 'Authorization': `Bearer ${token}` },
-            params: { limit: 50, fields: 'items(track(name,artists(name),album(name,images),duration_ms,external_urls))' }
+            params: { limit: 50, fields: 'items(track(name,artists(name),album(name,images),duration_ms,external_urls,uri,id))' }
         });
 
         const tracks = spotifyRes.data.items
@@ -688,7 +688,9 @@ app.get('/api/spotify/playlists/:playlistId/tracks', authenticateUser, async (re
                 album: item.track.album.name,
                 image: item.track.album.images?.[2]?.url || item.track.album.images?.[0]?.url || null,
                 duration_ms: item.track.duration_ms,
-                external_url: item.track.external_urls?.spotify || null
+                external_url: item.track.external_urls?.spotify || null,
+                uri: item.track.uri || null,
+                id: item.track.id || null
             }));
 
         res.json({ tracks });
@@ -766,6 +768,881 @@ app.get('/api/analytics', authenticateUser, async (req, res) => {
         });
     } catch (err) {
         console.error("Analytics Error:", err.response?.data || err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ===================================================================
+// NEW ENDPOINTS — Fulfilling all test use cases
+// ===================================================================
+
+// --- UC2: Create Playlist from Description ---
+app.post('/api/playlists/generate-from-description', authenticateUser, async (req, res) => {
+    const { description } = req.body;
+    if (!description || !description.trim()) {
+        return res.status(400).json({ error: "Description is required" });
+    }
+
+    try {
+        const { error: tokenError, token } = await getValidSpotifyToken(req.user.user_id);
+        if (tokenError) return res.status(401).json({ error: tokenError });
+
+        // Extract mood/genre keywords from the description
+        const moodKeywords = {
+            happy: ['happy', 'joy', 'cheerful', 'upbeat', 'excited', 'fun', 'celebration', 'party'],
+            sad: ['sad', 'melancholy', 'heartbreak', 'lonely', 'crying', 'depressed', 'gloomy'],
+            energetic: ['energetic', 'workout', 'gym', 'running', 'pump', 'hype', 'intense', 'power'],
+            calm: ['calm', 'relax', 'peaceful', 'meditation', 'sleep', 'ambient', 'chill', 'soothing'],
+            romantic: ['romantic', 'love', 'date', 'valentine', 'couple', 'passion'],
+            angry: ['angry', 'rage', 'aggressive', 'metal', 'hardcore'],
+            focus: ['focus', 'study', 'work', 'concentrate', 'productivity', 'coding'],
+            road_trip: ['road trip', 'driving', 'travel', 'adventure', 'summer']
+        };
+
+        const genreKeywords = {
+            pop: ['pop'],
+            rock: ['rock', 'alternative', 'indie'],
+            'hip-hop': ['hip hop', 'hip-hop', 'rap', 'trap'],
+            electronic: ['electronic', 'edm', 'house', 'techno', 'dubstep'],
+            jazz: ['jazz', 'blues', 'swing'],
+            classical: ['classical', 'orchestra', 'symphony', 'piano'],
+            country: ['country', 'folk', 'bluegrass'],
+            'r-n-b': ['r&b', 'rnb', 'soul', 'funk'],
+            latin: ['latin', 'reggaeton', 'salsa', 'bachata'],
+            metal: ['metal', 'heavy metal', 'death metal']
+        };
+
+        const descLower = description.toLowerCase();
+        let seedGenres = [];
+        let searchQuery = description;
+
+        // Find matching genres
+        for (const [genre, keywords] of Object.entries(genreKeywords)) {
+            if (keywords.some(kw => descLower.includes(kw))) {
+                seedGenres.push(genre);
+            }
+        }
+        if (seedGenres.length === 0) seedGenres = ['pop']; // default
+        seedGenres = seedGenres.slice(0, 2);
+
+        // Search Spotify for tracks matching the description
+        const searchRes = await axios.get('https://api.spotify.com/v1/search', {
+            headers: { 'Authorization': `Bearer ${token}` },
+            params: {
+                q: `genre:${seedGenres[0]} ${description.split(' ').slice(0, 3).join(' ')}`,
+                type: 'track',
+                limit: 20
+            }
+        });
+
+        const tracks = (searchRes.data.tracks?.items || []).map(t => ({
+            name: t.name,
+            artist: t.artists.map(a => a.name).join(', '),
+            album: t.album.name,
+            image: t.album.images?.[1]?.url || t.album.images?.[0]?.url || null,
+            duration_ms: t.duration_ms,
+            uri: t.uri,
+            id: t.id,
+            external_url: t.external_urls?.spotify || null
+        }));
+
+        if (tracks.length === 0) {
+            return res.status(404).json({ error: "No matching songs found for that description. Try different keywords." });
+        }
+
+        // Save the playlist to Supabase
+        const playlistName = `${description.substring(0, 50)}`;
+        const { data: plData, error: plError } = await supabase
+            .from('playlists')
+            .insert([{
+                creator_id: req.user.user_id,
+                name: playlistName,
+                description: description,
+                is_collaborative: false,
+                created_at: new Date().toISOString()
+            }])
+            .select('playlist_id');
+
+        if (plError) throw plError;
+
+        res.json({
+            message: "Playlist generated from description",
+            playlist_id: plData?.[0]?.playlist_id || null,
+            playlist_name: playlistName,
+            tracks
+        });
+    } catch (err) {
+        console.error("Generate from Description Error:", err.response?.data || err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- UC3: Generate Playlist from Listening History ---
+app.post('/api/playlists/generate-from-history', authenticateUser, async (req, res) => {
+    try {
+        const { error: tokenError, token } = await getValidSpotifyToken(req.user.user_id);
+        if (tokenError) return res.status(401).json({ error: tokenError });
+
+        // Get recently played + top tracks
+        const [recentRes, topRes] = await Promise.all([
+            axios.get('https://api.spotify.com/v1/me/player/recently-played', {
+                headers: { 'Authorization': `Bearer ${token}` },
+                params: { limit: 30 }
+            }).catch(() => ({ data: { items: [] } })),
+            axios.get('https://api.spotify.com/v1/me/top/tracks', {
+                headers: { 'Authorization': `Bearer ${token}` },
+                params: { time_range: 'short_term', limit: 20 }
+            }).catch(() => ({ data: { items: [] } }))
+        ]);
+
+        const recentTracks = (recentRes.data.items || []).map(i => i.track);
+        const topTracks = topRes.data.items || [];
+
+        // Combine and deduplicate
+        const trackMap = new Map();
+        [...topTracks, ...recentTracks].forEach(t => {
+            if (t && t.id && !trackMap.has(t.id)) {
+                trackMap.set(t.id, {
+                    name: t.name,
+                    artist: t.artists.map(a => a.name).join(', '),
+                    album: t.album.name,
+                    image: t.album.images?.[1]?.url || t.album.images?.[0]?.url || null,
+                    duration_ms: t.duration_ms,
+                    uri: t.uri,
+                    id: t.id,
+                    external_url: t.external_urls?.spotify || null
+                });
+            }
+        });
+
+        const tracks = Array.from(trackMap.values()).slice(0, 25);
+
+        if (tracks.length === 0) {
+            return res.status(404).json({ error: "No listening history available. Listen to some music on Spotify first!" });
+        }
+
+        // Count existing history playlists
+        const { data: existingPlaylists } = await supabase
+            .from('playlists')
+            .select('playlist_id')
+            .eq('creator_id', req.user.user_id)
+            .like('name', 'Your History Playlist%');
+
+        const count = (existingPlaylists?.length || 0) + 1;
+        const playlistName = `Your History Playlist #${count}`;
+
+        const { data: plData, error: plError } = await supabase
+            .from('playlists')
+            .insert([{
+                creator_id: req.user.user_id,
+                name: playlistName,
+                description: 'Generated from your listening history',
+                is_collaborative: false,
+                created_at: new Date().toISOString()
+            }])
+            .select('playlist_id');
+
+        if (plError) throw plError;
+
+        res.json({
+            message: "Playlist generated from listening history",
+            playlist_id: plData?.[0]?.playlist_id || null,
+            playlist_name: playlistName,
+            tracks
+        });
+    } catch (err) {
+        console.error("Generate from History Error:", err.response?.data || err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- UC4: Export Playlist to Spotify ---
+app.post('/api/playlists/:id/export', authenticateUser, async (req, res) => {
+    const playlistId = req.params.id;
+
+    try {
+        const { error: tokenError, token } = await getValidSpotifyToken(req.user.user_id);
+        if (tokenError) return res.status(401).json({ error: "Spotify not connected. Go to Settings to connect your account." });
+
+        // Get the playlist from Supabase
+        const { data: playlists, error: plError } = await supabase
+            .from('playlists')
+            .select('name, description')
+            .eq('playlist_id', playlistId);
+
+        if (plError) throw plError;
+        if (!playlists || playlists.length === 0) {
+            return res.status(404).json({ error: "Playlist not found" });
+        }
+
+        const playlist = playlists[0];
+
+        // Get Spotify user ID
+        const meRes = await axios.get('https://api.spotify.com/v1/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const spotifyUserId = meRes.data.id;
+
+        // Create playlist on Spotify
+        const createRes = await axios.post(
+            `https://api.spotify.com/v1/users/${spotifyUserId}/playlists`,
+            {
+                name: playlist.name,
+                description: playlist.description || 'Exported from Audio-Draft2',
+                public: false
+            },
+            { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } }
+        );
+
+        const spotifyPlaylistId = createRes.data.id;
+
+        // If we have track URIs in the request body, add them
+        const { track_uris } = req.body;
+        if (track_uris && track_uris.length > 0) {
+            await axios.post(
+                `https://api.spotify.com/v1/playlists/${spotifyPlaylistId}/tracks`,
+                { uris: track_uris.slice(0, 100) },
+                { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } }
+            );
+        }
+
+        // Record the export
+        await supabase.from('playlist_exports').insert([{
+            playlist_id: playlistId,
+            user_id: req.user.user_id,
+            spotify_playlist_id: spotifyPlaylistId,
+            exported_at: new Date().toISOString(),
+            status: 'SUCCESS'
+        }]);
+
+        // Send notification
+        await supabase.from('notifications').insert([{
+            user_id: req.user.user_id,
+            type: 'EXPORT',
+            message: `Playlist "${playlist.name}" exported to Spotify successfully!`,
+            is_read: false,
+            created_at: new Date().toISOString()
+        }]);
+
+        res.json({
+            message: "Playlist exported to Spotify successfully",
+            spotify_playlist_id: spotifyPlaylistId,
+            spotify_url: `https://open.spotify.com/playlist/${spotifyPlaylistId}`
+        });
+    } catch (err) {
+        console.error("Export Error:", err.response?.data || err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- UC5: Collaboration — Add/Remove Songs, Permissions ---
+app.post('/api/playlists/:id/songs', authenticateUser, async (req, res) => {
+    const { song_name, artist, uri } = req.body;
+    if (!song_name) return res.status(400).json({ error: "Song name is required" });
+
+    try {
+        // Check permission
+        const playlistId = req.params.id;
+        const userId = req.user.user_id;
+
+        const { data: pl } = await supabase.from('playlists').select('creator_id').eq('playlist_id', playlistId);
+        const isOwner = pl && pl[0] && pl[0].creator_id === userId;
+
+        if (!isOwner) {
+            const { data: collab } = await supabase.from('playlist_collaborators')
+                .select('permission_level')
+                .eq('playlist_id', playlistId)
+                .eq('user_id', userId);
+
+            if (!collab || collab.length === 0 || collab[0].permission_level === 'viewer') {
+                return res.status(403).json({ error: "You don't have permission to add songs" });
+            }
+        }
+
+        // Upsert song into Songs table
+        let songId;
+        const { data: existing } = await supabase.from('songs')
+            .select('song_id')
+            .eq('title', song_name)
+            .eq('artist', artist || '')
+            .limit(1);
+
+        if (existing && existing.length > 0) {
+            songId = existing[0].song_id;
+        } else {
+            const { data: newSong, error: songErr } = await supabase.from('songs')
+                .insert([{ title: song_name, artist: artist || '', spotify_uri: uri || '' }])
+                .select('song_id');
+            if (songErr) throw songErr;
+            songId = newSong[0].song_id;
+        }
+
+        // Create version entry
+        const { data: version, error: verErr } = await supabase.from('playlist_versions')
+            .insert([{
+                playlist_id: playlistId,
+                created_by: userId,
+                snapshot_date: new Date().toISOString(),
+                label: `Added ${song_name}`,
+                is_manual: true
+            }])
+            .select('version_id');
+
+        if (verErr) throw verErr;
+
+        // Add song to playlist
+        await supabase.from('playlist_songs').insert([{
+            version_id: version[0].version_id,
+            song_id: songId,
+            added_by: userId,
+            added_at: new Date().toISOString()
+        }]);
+
+        res.json({ message: "Song added to playlist" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/playlists/:id/songs/:songId', authenticateUser, async (req, res) => {
+    try {
+        const playlistId = req.params.id;
+        const songId = req.params.songId;
+        const userId = req.user.user_id;
+
+        // Check permission
+        const { data: pl } = await supabase.from('playlists').select('creator_id').eq('playlist_id', playlistId);
+        const isOwner = pl && pl[0] && pl[0].creator_id === userId;
+
+        if (!isOwner) {
+            const { data: collab } = await supabase.from('playlist_collaborators')
+                .select('permission_level')
+                .eq('playlist_id', playlistId)
+                .eq('user_id', userId);
+
+            if (!collab || collab.length === 0 || collab[0].permission_level === 'viewer') {
+                return res.status(403).json({ error: "You don't have permission to remove songs" });
+            }
+        }
+
+        // Get version IDs for this playlist
+        const { data: versions } = await supabase.from('playlist_versions')
+            .select('version_id')
+            .eq('playlist_id', playlistId);
+
+        if (versions && versions.length > 0) {
+            const versionIds = versions.map(v => v.version_id);
+            await supabase.from('playlist_songs')
+                .delete()
+                .eq('song_id', songId)
+                .in('version_id', versionIds);
+        }
+
+        res.json({ message: "Song removed from playlist" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/playlists/:id/permissions', authenticateUser, async (req, res) => {
+    const { user_id: targetUserId, permission_level } = req.body;
+    const validLevels = ['owner', 'editor', 'viewer'];
+
+    if (!targetUserId || !permission_level || !validLevels.includes(permission_level)) {
+        return res.status(400).json({ error: "Invalid user_id or permission_level (owner|editor|viewer)" });
+    }
+
+    try {
+        // Only owner can change permissions
+        const { data: pl } = await supabase.from('playlists')
+            .select('creator_id')
+            .eq('playlist_id', req.params.id);
+
+        if (!pl || pl.length === 0 || pl[0].creator_id !== req.user.user_id) {
+            return res.status(403).json({ error: "Only the playlist owner can change permissions" });
+        }
+
+        const { error } = await supabase.from('playlist_collaborators')
+            .update({ permission_level })
+            .eq('playlist_id', req.params.id)
+            .eq('user_id', targetUserId);
+
+        if (error) throw error;
+        res.json({ message: "Permission updated" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- UC7: Compare Playlists ---
+app.post('/api/playlists/compare', authenticateUser, async (req, res) => {
+    const { playlist_id_1, playlist_id_2, tracks_1, tracks_2 } = req.body;
+
+    if (!tracks_1 || !tracks_2) {
+        return res.status(400).json({ error: "Both track lists are required for comparison" });
+    }
+
+    try {
+        // Find common tracks by name+artist
+        const set1 = new Map(tracks_1.map(t => [`${t.name.toLowerCase()}|${t.artist.toLowerCase()}`, t]));
+        const commonTracks = [];
+        const uniqueTo2 = [];
+
+        tracks_2.forEach(t => {
+            const key = `${t.name.toLowerCase()}|${t.artist.toLowerCase()}`;
+            if (set1.has(key)) {
+                commonTracks.push(t);
+                set1.delete(key);
+            } else {
+                uniqueTo2.push(t);
+            }
+        });
+
+        const uniqueTo1 = Array.from(set1.values());
+
+        // Calculate similarity percentage
+        const totalUnique = new Set([
+            ...tracks_1.map(t => `${t.name.toLowerCase()}|${t.artist.toLowerCase()}`),
+            ...tracks_2.map(t => `${t.name.toLowerCase()}|${t.artist.toLowerCase()}`)
+        ]).size;
+        const similarity = totalUnique > 0 ? Math.round((commonTracks.length / totalUnique) * 100) : 0;
+
+        // Genre comparison (extract from artist names as a proxy)
+        const getArtists = (tracks) => {
+            const artists = {};
+            tracks.forEach(t => {
+                (t.artist || '').split(', ').forEach(a => {
+                    artists[a] = (artists[a] || 0) + 1;
+                });
+            });
+            return Object.entries(artists).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => ({ name, count }));
+        };
+
+        res.json({
+            similarity_pct: similarity,
+            common_tracks: commonTracks,
+            unique_to_playlist_1: uniqueTo1,
+            unique_to_playlist_2: uniqueTo2,
+            playlist_1_count: tracks_1.length,
+            playlist_2_count: tracks_2.length,
+            common_count: commonTracks.length,
+            top_artists_1: getArtists(tracks_1),
+            top_artists_2: getArtists(tracks_2)
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- UC9: Trending Songs ---
+app.get('/api/trending', authenticateUser, async (req, res) => {
+    try {
+        const { error: tokenError, token } = await getValidSpotifyToken(req.user.user_id);
+        if (tokenError) return res.status(401).json({ error: tokenError });
+
+        // Get global top 50 from Spotify's "Top 50 - Global" playlist
+        // Spotify's curated global top 50 playlist ID
+        const globalTop50Id = '37i9dQZEVXbMDoHDwVN2tF';
+
+        const spotifyRes = await axios.get(`https://api.spotify.com/v1/playlists/${globalTop50Id}/tracks`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+            params: { limit: 50, fields: 'items(track(name,artists(name),album(name,images),duration_ms,external_urls,popularity,uri,id))' }
+        });
+
+        let tracks = spotifyRes.data.items
+            .filter(item => item.track)
+            .map((item, index) => ({
+                rank: index + 1,
+                name: item.track.name,
+                artist: item.track.artists.map(a => a.name).join(', '),
+                album: item.track.album.name,
+                image: item.track.album.images?.[1]?.url || item.track.album.images?.[0]?.url || null,
+                duration_ms: item.track.duration_ms,
+                popularity: item.track.popularity || 0,
+                external_url: item.track.external_urls?.spotify || null,
+                uri: item.track.uri || null,
+                id: item.track.id || null
+            }));
+
+        // Sort by popularity (descending), then alphabetically for ties
+        tracks.sort((a, b) => {
+            if (b.popularity !== a.popularity) return b.popularity - a.popularity;
+            return a.name.localeCompare(b.name);
+        });
+
+        // Re-rank after sorting
+        tracks = tracks.map((t, i) => ({ ...t, rank: i + 1 }));
+
+        res.json({ tracks });
+    } catch (err) {
+        console.error("Trending Error:", err.response?.data || err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- UC11: Tag Songs with Mood Descriptors ---
+app.get('/api/mood-tags', authenticateUser, async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('mood_tag_definitions')
+            .select('tag_def_id, label, description')
+            .order('label');
+
+        if (error) throw error;
+        res.json({ tags: data || [] });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/songs/mood', authenticateUser, async (req, res) => {
+    const { song_name, artist, mood_label, spotify_uri } = req.body;
+
+    if (!song_name || !mood_label) {
+        return res.status(400).json({ error: "Song name and mood label are required" });
+    }
+
+    try {
+        // Find or create the song
+        let songId;
+        const { data: existing } = await supabase.from('songs')
+            .select('song_id')
+            .eq('title', song_name)
+            .limit(1);
+
+        if (existing && existing.length > 0) {
+            songId = existing[0].song_id;
+        } else {
+            const { data: newSong, error: songErr } = await supabase.from('songs')
+                .insert([{ title: song_name, artist: artist || '', spotify_uri: spotify_uri || '' }])
+                .select('song_id');
+            if (songErr) throw songErr;
+            songId = newSong[0].song_id;
+        }
+
+        // Find or create mood tag definition
+        let tagDefId;
+        const { data: existingTag } = await supabase.from('mood_tag_definitions')
+            .select('tag_def_id')
+            .eq('label', mood_label)
+            .limit(1);
+
+        if (existingTag && existingTag.length > 0) {
+            tagDefId = existingTag[0].tag_def_id;
+        } else {
+            const { data: newTag, error: tagErr } = await supabase.from('mood_tag_definitions')
+                .insert([{ label: mood_label, description: mood_label }])
+                .select('tag_def_id');
+            if (tagErr) throw tagErr;
+            tagDefId = newTag[0].tag_def_id;
+        }
+
+        // Add mood tag
+        const { error } = await supabase.from('mood_tags')
+            .insert([{
+                song_id: songId,
+                user_id: req.user.user_id,
+                label: tagDefId,
+                created_at: new Date().toISOString()
+            }]);
+
+        if (error) throw error;
+        res.json({ message: "Mood tag added" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/songs/mood/:songName', authenticateUser, async (req, res) => {
+    try {
+        const songName = decodeURIComponent(req.params.songName);
+        const { data: songs } = await supabase.from('songs')
+            .select('song_id')
+            .eq('title', songName)
+            .limit(1);
+
+        if (!songs || songs.length === 0) {
+            return res.json({ moods: [] });
+        }
+
+        const { data: tags, error } = await supabase.from('mood_tags')
+            .select('tag_id, label, created_at, mood_tag_definitions!inner(label)')
+            .eq('song_id', songs[0].song_id);
+
+        if (error) throw error;
+
+        const moods = (tags || []).map(t => ({
+            tag_id: t.tag_id,
+            label: t.mood_tag_definitions?.label || 'Unknown',
+            created_at: t.created_at
+        }));
+
+        res.json({ moods });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/songs/mood/:tagId', authenticateUser, async (req, res) => {
+    try {
+        const { error } = await supabase.from('mood_tags')
+            .delete()
+            .eq('tag_id', req.params.tagId)
+            .eq('user_id', req.user.user_id);
+
+        if (error) throw error;
+        res.json({ message: "Mood tag removed" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- UC12: Rename Playlist ---
+app.put('/api/playlists/:id/rename', authenticateUser, async (req, res) => {
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+        return res.status(400).json({ error: "Playlist name cannot be empty" });
+    }
+
+    try {
+        const { data: pl } = await supabase.from('playlists')
+            .select('creator_id')
+            .eq('playlist_id', req.params.id);
+
+        if (!pl || pl.length === 0) {
+            return res.status(404).json({ error: "Playlist not found" });
+        }
+
+        if (pl[0].creator_id !== req.user.user_id) {
+            return res.status(403).json({ error: "Only the playlist owner can rename it" });
+        }
+
+        const { error } = await supabase.from('playlists')
+            .update({ name: name.trim() })
+            .eq('playlist_id', req.params.id);
+
+        if (error) throw error;
+        res.json({ message: "Playlist renamed" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- UC14: Rate and Review Songs ---
+app.post('/api/songs/review', authenticateUser, async (req, res) => {
+    const { song_name, artist, rating, review_text, spotify_uri } = req.body;
+
+    if (!song_name || !rating) {
+        return res.status(400).json({ error: "Song name and rating are required" });
+    }
+
+    if (rating < 1 || rating > 5) {
+        return res.status(400).json({ error: "Rating must be between 1 and 5" });
+    }
+
+    try {
+        // Find or create song
+        let songId;
+        const { data: existing } = await supabase.from('songs')
+            .select('song_id')
+            .eq('title', song_name)
+            .limit(1);
+
+        if (existing && existing.length > 0) {
+            songId = existing[0].song_id;
+        } else {
+            const { data: newSong, error: songErr } = await supabase.from('songs')
+                .insert([{ title: song_name, artist: artist || '', spotify_uri: spotify_uri || '' }])
+                .select('song_id');
+            if (songErr) throw songErr;
+            songId = newSong[0].song_id;
+        }
+
+        // Check if review already exists (upsert)
+        const { data: existingReview } = await supabase.from('song_reviews')
+            .select('review_id')
+            .eq('song_id', songId)
+            .eq('user_id', req.user.user_id);
+
+        if (existingReview && existingReview.length > 0) {
+            const { error } = await supabase.from('song_reviews')
+                .update({ rating, review_text: review_text || '', created_at: new Date().toISOString() })
+                .eq('review_id', existingReview[0].review_id);
+            if (error) throw error;
+            return res.json({ message: "Review updated" });
+        }
+
+        const { error } = await supabase.from('song_reviews')
+            .insert([{
+                song_id: songId,
+                user_id: req.user.user_id,
+                rating,
+                review_text: review_text || '',
+                created_at: new Date().toISOString()
+            }]);
+
+        if (error) throw error;
+        res.json({ message: "Review submitted" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/songs/reviews/:songName', authenticateUser, async (req, res) => {
+    try {
+        const songName = decodeURIComponent(req.params.songName);
+        const { data: songs } = await supabase.from('songs')
+            .select('song_id')
+            .eq('title', songName)
+            .limit(1);
+
+        if (!songs || songs.length === 0) {
+            return res.json({ reviews: [], average_rating: null });
+        }
+
+        const { data: reviews, error } = await supabase.from('song_reviews')
+            .select('review_id, rating, review_text, created_at, user_id')
+            .eq('song_id', songs[0].song_id)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Get usernames
+        const userIds = [...new Set((reviews || []).map(r => r.user_id))];
+        let userMap = {};
+        if (userIds.length > 0) {
+            const { data: users } = await supabase.from('users')
+                .select('user_id, username')
+                .in('user_id', userIds);
+            (users || []).forEach(u => { userMap[u.user_id] = u.username; });
+        }
+
+        const enrichedReviews = (reviews || []).map(r => ({
+            ...r,
+            username: userMap[r.user_id] || 'Unknown'
+        }));
+
+        const avgRating = reviews && reviews.length > 0
+            ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
+            : null;
+
+        res.json({ reviews: enrichedReviews, average_rating: avgRating });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/songs/review/:reviewId', authenticateUser, async (req, res) => {
+    try {
+        const { error } = await supabase.from('song_reviews')
+            .delete()
+            .eq('review_id', req.params.reviewId)
+            .eq('user_id', req.user.user_id);
+
+        if (error) throw error;
+        res.json({ message: "Review deleted" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- UC15: Profile Analytics ---
+app.get('/api/profile-analytics', authenticateUser, async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+
+        // Get user's playlists count
+        const { data: playlists } = await supabase.from('playlists')
+            .select('playlist_id, name, created_at')
+            .eq('creator_id', userId);
+
+        // Get user's reviews
+        const { data: reviews } = await supabase.from('song_reviews')
+            .select('rating')
+            .eq('user_id', userId);
+
+        // Get user's friendships
+        const { data: friendships } = await supabase.from('friendships')
+            .select('friend_id')
+            .eq('status', 'ACCEPTED')
+            .or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`);
+
+        // Get exports
+        const { data: exports } = await supabase.from('playlist_exports')
+            .select('export_id')
+            .eq('user_id', userId);
+
+        // Get Spotify data if available
+        let spotifyData = null;
+        try {
+            const { error: tokenError, token } = await getValidSpotifyToken(userId);
+            if (!tokenError && token) {
+                const [topArtists, topTracks, recent] = await Promise.all([
+                    axios.get('https://api.spotify.com/v1/me/top/artists', {
+                        headers: { 'Authorization': `Bearer ${token}` },
+                        params: { time_range: 'long_term', limit: 5 }
+                    }).catch(() => ({ data: { items: [] } })),
+                    axios.get('https://api.spotify.com/v1/me/top/tracks', {
+                        headers: { 'Authorization': `Bearer ${token}` },
+                        params: { time_range: 'long_term', limit: 5 }
+                    }).catch(() => ({ data: { items: [] } })),
+                    axios.get('https://api.spotify.com/v1/me/player/recently-played', {
+                        headers: { 'Authorization': `Bearer ${token}` },
+                        params: { limit: 50 }
+                    }).catch(() => ({ data: { items: [] } }))
+                ]);
+
+                // Calculate estimated listening time from recent plays
+                const totalMs = recent.data.items.reduce((sum, i) => sum + (i.track?.duration_ms || 0), 0);
+
+                spotifyData = {
+                    top_artists: topArtists.data.items.map(a => ({
+                        name: a.name,
+                        image: a.images?.[1]?.url || a.images?.[0]?.url || null,
+                        genres: (a.genres || []).slice(0, 2)
+                    })),
+                    top_tracks: topTracks.data.items.map(t => ({
+                        name: t.name,
+                        artist: t.artists.map(a => a.name).join(', '),
+                        image: t.album.images?.[1]?.url || null
+                    })),
+                    recent_listening_ms: totalMs,
+                    recent_track_count: recent.data.items.length
+                };
+            }
+        } catch (e) { /* Spotify data is optional */ }
+
+        const avgRating = reviews && reviews.length > 0
+            ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
+            : null;
+
+        res.json({
+            playlists_count: playlists?.length || 0,
+            reviews_count: reviews?.length || 0,
+            average_rating_given: avgRating,
+            friends_count: friendships?.length || 0,
+            exports_count: exports?.length || 0,
+            playlists: (playlists || []).slice(0, 10).map(p => ({ name: p.name, created_at: p.created_at })),
+            spotify: spotifyData
+        });
+    } catch (err) {
+        console.error("Profile Analytics Error:", err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- Get user's Supabase playlists (for internal features) ---
+app.get('/api/playlists/internal', authenticateUser, async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('playlists')
+            .select('playlist_id, name, description, is_collaborative, created_at')
+            .eq('creator_id', req.user.user_id)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        res.json({ playlists: data || [] });
+    } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });

@@ -15,6 +15,29 @@
         .dashboard-header h1 { font-size: 2rem; margin-bottom: 8px; }
         .dashboard-header p { color: var(--text-secondary); }
 
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .dashboard-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .dashboard-card h2 { font-size: 1.2rem; margin-bottom: 16px; }
+
+        .quick-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 32px;
+        }
+
         .now-playing-card {
             display: flex;
             align-items: center;
@@ -120,6 +143,136 @@
             animation: pulse 1.5s infinite;
         }
 
+        /* Trending */
+        .trending-section {
+            margin-top: 32px;
+        }
+        .trending-section h2 {
+            font-size: 1.5rem;
+            margin-bottom: 16px;
+        }
+        .trending-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .trending-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 8px;
+            transition: background 0.2s;
+            cursor: pointer;
+        }
+        .trending-item:hover { background: rgba(255,255,255,0.05); }
+        .trending-rank {
+            width: 28px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-align: center;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+        .trending-rank.top3 { color: var(--accent-purple); font-size: 1rem; }
+        .trending-img {
+            width: 44px;
+            height: 44px;
+            border-radius: 4px;
+            object-fit: cover;
+            flex-shrink: 0;
+            background: rgba(255,255,255,0.05);
+        }
+        .trending-info { flex: 1; min-width: 0; }
+        .trending-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .trending-artist {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .trending-actions {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .trending-actions .btn--icon {
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .trending-actions .btn--icon:hover {
+            background: var(--accent-purple);
+            color: white;
+            border-color: var(--accent-purple);
+        }
+
+        /* Mood tag modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 300;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 32px;
+            width: 90%;
+            max-width: 480px;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+        }
+        .modal h3 { margin-bottom: 16px; }
+        .modal .form-group { margin-bottom: 16px; }
+        .modal .btn-row { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; }
+
+        .mood-badges { display: flex; flex-wrap: wrap; gap: 8px; }
+        .mood-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid var(--border-color);
+            background: rgba(255,255,255,0.03);
+            color: var(--text-secondary);
+        }
+        .mood-badge:hover, .mood-badge.selected {
+            background: rgba(167,139,250,0.15);
+            border-color: var(--accent-purple);
+            color: var(--accent-purple);
+        }
+
+        /* Star rating */
+        .star-rating { display: flex; gap: 4px; cursor: pointer; }
+        .star-rating .star {
+            font-size: 1.5rem;
+            color: var(--border-color);
+            transition: color 0.15s;
+        }
+        .star-rating .star.active { color: #fbbf24; }
+        .star-rating .star:hover { color: #fbbf24; }
+
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -173,6 +326,11 @@
                     <p>Here's what's playing right now.</p>
                 </div>
 
+                <div class="quick-actions">
+                    <button class="btn btn--primary" id="btn-generate-desc" style="border: 1px solid var(--accent-purple);">🎵 Create Playlist from Description</button>
+                    <button class="btn btn--dark" id="btn-generate-history">📜 Generate from History</button>
+                </div>
+
                 <div id="now-playing-container">
                     <div class="empty-state">
                         <div class="empty-state__icon">🎧</div>
@@ -180,11 +338,311 @@
                         <p>Loading your current playback.</p>
                     </div>
                 </div>
+
+                <!-- Trending Songs Section -->
+                <div class="trending-section">
+                    <h2>🔥 Trending Songs</h2>
+                    <div id="trending-container">
+                        <div class="empty-state">
+                            <h3>Loading trending songs...</h3>
+                            <p>Fetching the top 50 trending tracks.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
 
+    <!-- Mood Tag Modal -->
+    <div class="modal-overlay" id="mood-modal-overlay">
+        <div class="modal">
+            <h3>🎭 Tag Song with Mood</h3>
+            <p style="color: var(--text-secondary); font-size: 0.9rem;" id="mood-modal-song"></p>
+            <div class="mood-badges" style="margin-top: 16px;">
+                <span class="mood-badge" data-mood="Happy">😊 Happy</span>
+                <span class="mood-badge" data-mood="Sad">😢 Sad</span>
+                <span class="mood-badge" data-mood="Energetic">⚡ Energetic</span>
+                <span class="mood-badge" data-mood="Calm">🧘 Calm</span>
+                <span class="mood-badge" data-mood="Romantic">❤️ Romantic</span>
+                <span class="mood-badge" data-mood="Angry">😤 Angry</span>
+                <span class="mood-badge" data-mood="Focus">🎯 Focus</span>
+                <span class="mood-badge" data-mood="Chill">🌊 Chill</span>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn--dark" id="mood-modal-cancel">Cancel</button>
+                <button class="btn btn--primary" id="mood-modal-save" style="border: 1px solid var(--accent-purple);">Save Tag</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Review Modal -->
+    <div class="modal-overlay" id="review-modal-overlay">
+        <div class="modal">
+            <h3>⭐ Rate & Review</h3>
+            <p style="color: var(--text-secondary); font-size: 0.9rem;" id="review-modal-song"></p>
+            <div class="star-rating" id="star-rating" style="margin-top: 16px;">
+                <span class="star" data-value="1">★</span>
+                <span class="star" data-value="2">★</span>
+                <span class="star" data-value="3">★</span>
+                <span class="star" data-value="4">★</span>
+                <span class="star" data-value="5">★</span>
+            </div>
+            <div class="form-group" style="margin-top: 16px;">
+                <textarea id="review-text" class="form-input" rows="3" placeholder="Write your review..." style="resize: vertical; width: 100%;"></textarea>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn--dark" id="review-modal-cancel">Cancel</button>
+                <button class="btn btn--primary" id="review-modal-save" style="border: 1px solid var(--accent-purple);">Submit Review</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generate from Description Modal -->
+    <div class="modal-overlay" id="desc-modal-overlay">
+        <div class="modal">
+            <h3>🎵 Create Playlist from Description</h3>
+            <p style="color: var(--text-secondary); font-size: 0.9rem;">Describe a mood, scenario, or style and we'll generate a playlist for you.</p>
+            <div class="form-group" style="margin-top: 16px;">
+                <textarea id="playlist-description" class="form-input" rows="3" placeholder='e.g. "Upbeat pop songs for a summer road trip" or "Calm jazz for studying"' style="resize: vertical; width: 100%;"></textarea>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn--dark" id="desc-modal-cancel">Cancel</button>
+                <button class="btn btn--primary" id="desc-modal-generate" style="border: 1px solid var(--accent-purple);">Generate Playlist</button>
+            </div>
+            <div id="desc-modal-result" style="margin-top: 16px;"></div>
+        </div>
+    </div>
+
     <script src="js/main.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            loadTrending();
+
+            // Generate from Description modal
+            const descBtn = document.getElementById('btn-generate-desc');
+            const descModal = document.getElementById('desc-modal-overlay');
+            const descCancel = document.getElementById('desc-modal-cancel');
+            const descGenerate = document.getElementById('desc-modal-generate');
+
+            if (descBtn) descBtn.addEventListener('click', () => descModal.classList.add('open'));
+            if (descCancel) descCancel.addEventListener('click', () => {
+                descModal.classList.remove('open');
+                document.getElementById('desc-modal-result').innerHTML = '';
+            });
+            if (descGenerate) descGenerate.addEventListener('click', generateFromDescription);
+
+            // Generate from History button
+            const histBtn = document.getElementById('btn-generate-history');
+            if (histBtn) histBtn.addEventListener('click', generateFromHistory);
+
+            // Mood modal
+            const moodOverlay = document.getElementById('mood-modal-overlay');
+            const moodCancel = document.getElementById('mood-modal-cancel');
+            const moodSave = document.getElementById('mood-modal-save');
+            if (moodCancel) moodCancel.addEventListener('click', () => moodOverlay.classList.remove('open'));
+
+            document.querySelectorAll('.mood-badge').forEach(badge => {
+                badge.addEventListener('click', () => {
+                    document.querySelectorAll('.mood-badge').forEach(b => b.classList.remove('selected'));
+                    badge.classList.add('selected');
+                });
+            });
+
+            if (moodSave) moodSave.addEventListener('click', saveMoodTag);
+
+            // Review modal
+            const reviewOverlay = document.getElementById('review-modal-overlay');
+            const reviewCancel = document.getElementById('review-modal-cancel');
+            const reviewSave = document.getElementById('review-modal-save');
+            if (reviewCancel) reviewCancel.addEventListener('click', () => reviewOverlay.classList.remove('open'));
+
+            const stars = document.querySelectorAll('#star-rating .star');
+            stars.forEach(star => {
+                star.addEventListener('click', () => {
+                    const val = parseInt(star.dataset.value);
+                    stars.forEach(s => {
+                        s.classList.toggle('active', parseInt(s.dataset.value) <= val);
+                    });
+                    document.getElementById('star-rating').dataset.rating = val;
+                });
+            });
+
+            if (reviewSave) reviewSave.addEventListener('click', saveReview);
+        });
+
+        let currentMoodSong = null;
+        let currentReviewSong = null;
+
+        async function loadTrending() {
+            const container = document.getElementById('trending-container');
+            try {
+                const res = await apiFetch('/api/trending');
+                if (!res.ok) {
+                    const err = await res.json();
+                    container.innerHTML = `<div class="empty-state"><h3>Connect Spotify</h3><p>${err.error || 'Go to Settings to connect your Spotify account.'}</p></div>`;
+                    return;
+                }
+                const data = await res.json();
+                if (!data.tracks || data.tracks.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><h3>No Trending Data</h3><p>Could not load trending songs.</p></div>';
+                    return;
+                }
+
+                container.innerHTML = '<div class="trending-list">' + data.tracks.map(t => {
+                    const imgHtml = t.image
+                        ? `<img class="trending-img" src="${sanitize(t.image)}" alt="">`
+                        : `<div class="trending-img"></div>`;
+                    return `
+                    <div class="trending-item">
+                        <div class="trending-rank ${t.rank <= 3 ? 'top3' : ''}">${t.rank}</div>
+                        ${imgHtml}
+                        <div class="trending-info">
+                            <div class="trending-name">${sanitize(t.name)}</div>
+                            <div class="trending-artist">${sanitize(t.artist)}</div>
+                        </div>
+                        <div class="trending-actions">
+                            <button class="btn--icon" onclick="openMoodModal('${sanitize(t.name).replace(/'/g, "\\'")}', '${sanitize(t.artist).replace(/'/g, "\\'")}')">🎭</button>
+                            <button class="btn--icon" onclick="openReviewModal('${sanitize(t.name).replace(/'/g, "\\'")}', '${sanitize(t.artist).replace(/'/g, "\\'")}')">⭐</button>
+                        </div>
+                    </div>`;
+                }).join('') + '</div>';
+            } catch (err) {
+                container.innerHTML = '<div class="empty-state"><h3>Error</h3><p>Failed to load trending songs.</p></div>';
+            }
+        }
+
+        async function generateFromDescription() {
+            const desc = document.getElementById('playlist-description').value.trim();
+            const resultDiv = document.getElementById('desc-modal-result');
+            const btn = document.getElementById('desc-modal-generate');
+
+            if (!desc) { alert('Please enter a description'); return; }
+
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+            resultDiv.innerHTML = '<p style="color: var(--text-secondary);">Generating playlist...</p>';
+
+            try {
+                const res = await apiFetch('/api/playlists/generate-from-description', {
+                    method: 'POST',
+                    body: JSON.stringify({ description: desc })
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    resultDiv.innerHTML = `<p style="color: var(--accent-red);">${data.error}</p>`;
+                    return;
+                }
+
+                resultDiv.innerHTML = `
+                    <div style="background: rgba(74,222,128,0.1); padding: 16px; border-radius: 8px; border: 1px solid rgba(74,222,128,0.3);">
+                        <strong style="color: #4ade80;">✓ Playlist "${sanitize(data.playlist_name)}" created!</strong>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 8px;">${data.tracks.length} tracks generated. Go to Playlists to manage it.</p>
+                    </div>`;
+            } catch (err) {
+                resultDiv.innerHTML = '<p style="color: var(--accent-red);">Failed to generate playlist.</p>';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Generate Playlist';
+            }
+        }
+
+        async function generateFromHistory() {
+            const btn = document.getElementById('btn-generate-history');
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+
+            try {
+                const res = await apiFetch('/api/playlists/generate-from-history', { method: 'POST' });
+                const data = await res.json();
+
+                if (res.ok) {
+                    alert(`✓ "${data.playlist_name}" created with ${data.tracks.length} tracks! Go to Playlists to see it.`);
+                } else {
+                    alert(data.error || 'Failed to generate playlist');
+                }
+            } catch (err) {
+                alert('Failed to generate playlist from history.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '📜 Generate from History';
+            }
+        }
+
+        function openMoodModal(songName, artist) {
+            currentMoodSong = { name: songName, artist: artist };
+            document.getElementById('mood-modal-song').textContent = `${songName} — ${artist}`;
+            document.querySelectorAll('.mood-badge').forEach(b => b.classList.remove('selected'));
+            document.getElementById('mood-modal-overlay').classList.add('open');
+        }
+
+        async function saveMoodTag() {
+            const selected = document.querySelector('.mood-badge.selected');
+            if (!selected || !currentMoodSong) { alert('Please select a mood'); return; }
+
+            const btn = document.getElementById('mood-modal-save');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
+            try {
+                const res = await apiFetch('/api/songs/mood', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        song_name: currentMoodSong.name,
+                        artist: currentMoodSong.artist,
+                        mood_label: selected.dataset.mood
+                    })
+                });
+                const data = await res.json();
+                alert(data.message || data.error);
+                document.getElementById('mood-modal-overlay').classList.remove('open');
+            } catch (err) {
+                alert('Failed to save mood tag');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Save Tag';
+            }
+        }
+
+        function openReviewModal(songName, artist) {
+            currentReviewSong = { name: songName, artist: artist };
+            document.getElementById('review-modal-song').textContent = `${songName} — ${artist}`;
+            document.getElementById('review-text').value = '';
+            document.querySelectorAll('#star-rating .star').forEach(s => s.classList.remove('active'));
+            document.getElementById('star-rating').dataset.rating = '0';
+            document.getElementById('review-modal-overlay').classList.add('open');
+        }
+
+        async function saveReview() {
+            const rating = parseInt(document.getElementById('star-rating').dataset.rating || '0');
+            if (!rating || !currentReviewSong) { alert('Please select a rating'); return; }
+
+            const reviewText = document.getElementById('review-text').value;
+            const btn = document.getElementById('review-modal-save');
+            btn.disabled = true;
+            btn.textContent = 'Submitting...';
+
+            try {
+                const res = await apiFetch('/api/songs/review', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        song_name: currentReviewSong.name,
+                        artist: currentReviewSong.artist,
+                        rating: rating,
+                        review_text: reviewText
+                    })
+                });
+                const data = await res.json();
+                alert(data.message || data.error);
+                document.getElementById('review-modal-overlay').classList.remove('open');
+            } catch (err) {
+                alert('Failed to submit review');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Submit Review';
+            }
+        }
+    </script>
 </body>
 
 </html>
