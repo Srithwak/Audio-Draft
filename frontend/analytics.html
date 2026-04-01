@@ -11,173 +11,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <style>
-        .layout {
-            display: flex;
-            min-height: 100vh;
-            background-color: var(--bg-primary);
-        }
-
-        .sidebar {
-            width: 250px;
-            background-color: var(--bg-secondary);
-            border-right: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            padding: 24px 0;
-        }
-
-        .sidebar__logo {
-            padding: 0 24px 32px 24px;
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .sidebar__nav {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .sidebar__link {
-            padding: 12px 24px;
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-weight: 500;
-            transition: color 0.2s, background-color 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .sidebar__link:hover,
-        .sidebar__link.active {
-            color: var(--text-primary);
-            background-color: rgba(255, 255, 255, 0.05);
-        }
-
-        .sidebar__link.active {
-            border-right: 3px solid var(--accent-purple);
-        }
-
-        .sidebar__footer {
-            padding: 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .user-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: var(--gradient-primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            color: white;
-        }
-
-        .main-view {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
-        }
-
-        .topbar {
-            height: 72px;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 48px;
-            background-color: rgba(13, 13, 18, 0.8);
-            backdrop-filter: blur(12px);
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-
-        .page-content {
-            padding: 40px 48px;
-            max-width: 1200px;
-            margin: 0 auto;
-            width: 100%;
-        }
-
-        /* Analytics Specific Styles */
-        .analytics-hero {
-            background: var(--gradient-glow);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-lg);
-            padding: 32px;
-            margin-bottom: 32px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .analytics-hero::after {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -10%;
-            width: 400px;
-            height: 400px;
-            background: radial-gradient(circle, rgba(167, 139, 250, 0.1) 0%, transparent 70%);
-            z-index: 0;
-        }
-
-        .hero-text {
-            position: relative;
-            z-index: 1;
-        }
-
-        .hero-stats {
-            display: flex;
-            gap: 48px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .stat-item {
-            text-align: center;
-        }
-
-        .stat-value {
-            font-size: 1.75rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            display: block;
-        }
-
-        .stat-label {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
+        .page-content { max-width: 1200px; }
 
         .timeframe-selector {
             display: flex;
             gap: 8px;
             background: var(--bg-secondary);
             padding: 4px;
-            border-radius: var(--radius-md);
+            border-radius: 8px;
             border: 1px solid var(--border-color);
             margin-bottom: 32px;
             align-self: flex-start;
@@ -190,127 +31,147 @@
             color: var(--text-secondary);
             font-size: 0.85rem;
             font-weight: 600;
-            border-radius: var(--radius-sm);
+            border-radius: 6px;
             cursor: pointer;
             transition: all 0.2s;
         }
 
-        .timeframe-btn:hover {
-            color: var(--text-primary);
-        }
-
-        .timeframe-btn.active {
-            background: var(--bg-hover);
-            color: var(--accent-purple);
-        }
+        .timeframe-btn:hover { color: var(--text-primary); }
+        .timeframe-btn.active { background: var(--bg-hover); color: var(--accent-purple); }
 
         .analytics-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 32px;
+            gap: 24px;
         }
 
         .analytics-card {
             background: var(--bg-secondary);
             border: 1px solid var(--border-color);
-            border-radius: var(--radius-lg);
+            border-radius: 12px;
             padding: 24px;
         }
 
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-        }
+        .analytics-card--full { grid-column: span 2; }
 
         .card-title {
-            font-size: 1.1rem;
+            font-size: 1rem;
             font-weight: 700;
-            margin: 0;
-            display: flex;
-            align-items: center;
-            gap: 12px;
+            margin: 0 0 20px 0;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 0.8rem;
         }
 
-        .ranking-list {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
+        .ranking-list { display: flex; flex-direction: column; gap: 8px; }
 
         .ranking-item {
             display: flex;
             align-items: center;
-            gap: 16px;
-            padding: 12px;
+            gap: 14px;
+            padding: 10px 12px;
             background: rgba(255, 255, 255, 0.02);
-            border-radius: var(--radius-md);
+            border-radius: 8px;
             transition: background 0.2s;
         }
 
-        .ranking-item:hover {
-            background: rgba(255, 255, 255, 0.04);
+        .ranking-item:hover { background: rgba(255, 255, 255, 0.04); }
+
+        .ranking-rank {
+            width: 24px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-align: center;
+            font-size: 0.85rem;
+            flex-shrink: 0;
         }
 
         .ranking-img {
-            width: 48px;
-            height: 48px;
+            width: 44px;
+            height: 44px;
             border-radius: 4px;
             object-fit: cover;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            flex-shrink: 0;
+            background: rgba(255,255,255,0.05);
         }
 
-        .ranking-info {
-            flex: 1;
-            min-width: 0;
-        }
+        .ranking-img--round { border-radius: 50%; }
+
+        .ranking-info { flex: 1; min-width: 0; }
 
         .ranking-name {
             font-weight: 600;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
         .ranking-sub {
-            font-size: 0.8rem;
+            font-size: 0.78rem;
             color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 2px;
+        }
+
+        .genre-badge {
+            display: inline-block;
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: rgba(167,139,250,0.1);
+            color: var(--accent-purple);
+            margin-right: 4px;
+            margin-top: 4px;
+        }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px 24px;
+            text-align: center;
+        }
+
+        .stat-card__label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 8px;
+        }
+
+        .stat-card__value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-primary);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
-        .progress-bar {
-            height: 4px;
-            background: var(--border-color);
-            border-radius: 2px;
-            margin-top: 8px;
-            width: 100%;
-            overflow: hidden;
-        }
+        .stat-card--accent .stat-card__value { color: var(--accent-purple); }
 
-        .progress-fill {
-            height: 100%;
-            background: var(--accent-purple);
-            border-radius: 2px;
-        }
-
-        .status-badge {
-            font-size: 0.7rem;
-            font-weight: 700;
-            padding: 4px 8px;
-            border-radius: 4px;
-            background: rgba(167, 139, 250, 0.1);
-            color: var(--accent-purple);
+        .empty-state {
+            text-align: center;
+            padding: 48px 24px;
+            color: var(--text-secondary);
         }
     </style>
 </head>
 
 <body>
     <div class="layout">
-        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar__logo">
                 <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
@@ -319,7 +180,6 @@
                 </svg>
                 Audio-Draft2
             </div>
-
             <nav class="sidebar__nav">
                 <a href="dashboard.html" class="sidebar__link">Dashboard</a>
                 <a href="social.html" class="sidebar__link">Social</a>
@@ -327,86 +187,54 @@
                 <a href="analytics.html" class="sidebar__link active">Analytics</a>
                 <a href="settings.html" class="sidebar__link">Settings</a>
             </nav>
-
             <div class="sidebar__footer">
                 <div class="user-info">
                     <div class="user-avatar" id="nav-avatar">?</div>
-                    <div>
-                        <div style="font-weight: 600;" id="nav-username">Loading...</div>
-                    </div>
+                    <div><div style="font-weight: 600;" id="nav-username">Loading...</div></div>
                 </div>
                 <button class="btn btn--dark" id="logout-btn" style="width: 100%; margin-top: 12px;">Sign Out</button>
             </div>
         </aside>
 
-        <!-- Main Content -->
         <main class="main-view">
             <header class="topbar">
-                <div class="topbar__title">Profile Analytics</div>
+                <div class="topbar__title">Analytics</div>
                 <div class="topbar__actions">
-                    <span class="status-badge" id="spotify-sync-status">Syncing...</span>
+                    <span id="spotify-sync-status" style="font-size: 0.8rem; color: var(--text-secondary);">Loading...</span>
                 </div>
             </header>
 
             <div class="page-content">
-                <div class="analytics-hero">
-                    <div class="hero-text">
-                        <h1 id="analytics-header">Listening Insights</h1>
-                        <p class="text-secondary">Discover your musical identity across the weeks.</p>
-                    </div>
-                    <div class="hero-stats">
-                        <div class="stat-item">
-                            <span class="stat-value" id="songs-logged">...</span>
-                            <span class="stat-label">Songs</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-value" id="total-playtime">...</span>
-                            <span class="stat-label">Playtime</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-value" id="top-genre">Pop</span>
-                            <span class="stat-label">Top Genre</span>
-                        </div>
-                    </div>
+                <div class="genre-hero">
+                    <div class="genre-hero__label">Your Top Genre</div>
+                    <div class="genre-hero__value" id="top-genre">...</div>
                 </div>
 
                 <div class="timeframe-selector">
-                    <button class="timeframe-btn active" data-time="short_term">Recent</button>
-                    <button class="timeframe-btn" data-time="medium_term">6 Months</button>
+                    <button class="timeframe-btn active" data-time="short_term">Last 4 Weeks</button>
+                    <button class="timeframe-btn" data-time="medium_term">Last 6 Months</button>
                     <button class="timeframe-btn" data-time="long_term">All Time</button>
                 </div>
 
                 <div class="analytics-grid">
-                    <!-- Top Artists -->
                     <div class="analytics-card">
-                        <div class="card-header">
-                            <h2 class="card-title">Top Artists</h2>
-                        </div>
+                        <h2 class="card-title">Top Artists</h2>
                         <div id="top-artists-list" class="ranking-list">
-                            <!-- Loading Items -->
-                            <p class="text-muted">Loading your favorites...</p>
+                            <p class="text-muted">Loading...</p>
                         </div>
                     </div>
 
-                    <!-- Top Tracks -->
                     <div class="analytics-card">
-                        <div class="card-header">
-                            <h2 class="card-title">Top Tracks</h2>
-                        </div>
+                        <h2 class="card-title">Top Tracks</h2>
                         <div id="top-tracks-list" class="ranking-list">
-                            <!-- Loading Items -->
-                            <p class="text-muted">Loading your anthems...</p>
+                            <p class="text-muted">Loading...</p>
                         </div>
                     </div>
 
-                    <!-- Recent Activity -->
-                    <div class="analytics-card" style="grid-column: span 2;">
-                        <div class="card-header">
-                            <h2 class="card-title">Recently Played</h2>
-                        </div>
+                    <div class="analytics-card analytics-card--full">
+                        <h2 class="card-title">Recently Played</h2>
                         <div id="recent-tracks-list" class="ranking-list">
-                            <!-- Loading Items -->
-                            <p class="text-muted">Fetching recent history...</p>
+                            <p class="text-muted">Loading...</p>
                         </div>
                     </div>
                 </div>

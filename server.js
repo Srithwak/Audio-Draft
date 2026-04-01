@@ -9,8 +9,14 @@ const querystring = require('querystring');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const supabaseUrl = process.env.API_URL || "https://dapejabajxyemszxbcqm.supabase.co";
-const ANON_PUBLIC_KEY = process.env.ANON_PUBLIC_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRhcGVqYWJhanh5ZW1zenhiY3FtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMjk5MzQsImV4cCI6MjA4NzkwNTkzNH0.JJGVSi9w766w0-sr4t92fobqZfzVqwEQoPBwPZc2BV4";
+// --- Fail-fast if .env is missing ---
+const supabaseUrl = process.env.API_URL;
+const ANON_PUBLIC_KEY = process.env.ANON_PUBLIC_KEY;
+
+if (!supabaseUrl || !ANON_PUBLIC_KEY) {
+    console.error("FATAL: Missing API_URL or ANON_PUBLIC_KEY in database/.env");
+    process.exit(1);
+}
 
 const supabase = createClient(supabaseUrl, ANON_PUBLIC_KEY);
 
@@ -23,25 +29,74 @@ supabase.from('users').select('user_id').limit(1).then(({ error }) => {
     else console.log("Connected to Supabase.");
 });
 
-const REDIRECT_URI = 'http://127.0.0.1:5001/spotify/callback';
+const REDIRECT_URI = `http://127.0.0.1:${PORT}/spotify/callback`;
 
-// Auth Middleware
+// --- Spotify credentials from .env ---
+const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
+const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
+
+if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
+    console.warn("WARNING: Missing SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET in database/.env — Spotify features disabled.");
+}
+
+// In-memory token storage (per user)
+const spotifyTokens = new Map();
+
+// --- Auth Middleware ---
 const authenticateUser = (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: "Unauthorized: Missing or invalid token" });
     }
-    const token = authHeader.split(' ')[1]; // we are using the user_id as the token for now
+    const token = authHeader.split(' ')[1]; // user_id as token (simple auth)
     req.user = { user_id: token };
     next();
 };
 
-// Root route
+// --- Spotify Token Helper (in-memory, no database) ---
+async function getValidSpotifyToken(userId) {
+    if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
+        return { error: "Spotify not configured on server", token: null };
+    }
+
+    const stored = spotifyTokens.get(userId);
+    if (!stored || !stored.refresh_token) {
+        return { error: "Spotify not connected. Go to Settings to connect.", token: null };
+    }
+
+    let token = stored.access_token;
+
+    // Refresh if expired or no token yet
+    if (!token || !stored.expires_at || new Date(stored.expires_at) <= new Date()) {
+        try {
+            const refreshRes = await axios.post('https://accounts.spotify.com/api/token',
+                querystring.stringify({
+                    grant_type: 'refresh_token',
+                    refresh_token: stored.refresh_token
+                }), {
+                headers: {
+                    'Authorization': 'Basic ' + Buffer.from(SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).toString('base64'),
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+            token = refreshRes.data.access_token;
+            const expires_at = new Date(Date.now() + refreshRes.data.expires_in * 1000).toISOString();
+            spotifyTokens.set(userId, { ...stored, access_token: token, expires_at });
+        } catch (err) {
+            console.error("Spotify token refresh failed:", err.response?.data || err.message);
+            return { error: "Spotify token refresh failed", token: null };
+        }
+    }
+
+    return { error: null, token };
+}
+
+// --- Root route ---
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
 });
 
-// Register
+// --- Register ---
 app.post('/api/auth/register', async (req, res) => {
     const { username, email, password } = req.body;
 
@@ -52,7 +107,7 @@ app.post('/api/auth/register', async (req, res) => {
     try {
         const { data: existingUsers, error: checkError } = await supabase
             .from('users')
-            .select('*')
+            .select('user_id')
             .or(`email.eq.${email},username.eq.${username}`);
 
         if (checkError) throw checkError;
@@ -67,7 +122,7 @@ app.post('/api/auth/register', async (req, res) => {
         const { data: insertData, error: insertError } = await supabase
             .from('users')
             .insert([{ username, email, password_hash }])
-            .select();
+            .select('user_id, username, email, theme_pref');
 
         if (insertError) throw insertError;
 
@@ -86,7 +141,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
 });
 
-// Login
+// --- Login ---
 app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
 
@@ -97,7 +152,7 @@ app.post('/api/auth/login', async (req, res) => {
     try {
         const { data: users, error } = await supabase
             .from('users')
-            .select('*')
+            .select('user_id, username, email, password_hash, theme_pref')
             .eq('email', email);
 
         if (error) throw error;
@@ -128,7 +183,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-// Get current user profile
+// --- Get current user profile ---
 app.get('/api/auth/me', authenticateUser, async (req, res) => {
     try {
         const { data: users, error } = await supabase
@@ -141,36 +196,26 @@ app.get('/api/auth/me', authenticateUser, async (req, res) => {
             return res.status(404).json({ error: "User not found" });
         }
 
-        res.json({ user: { id: users[0].user_id, username: users[0].username, email: users[0].email, theme_pref: users[0].theme_pref } });
+        res.json({
+            user: {
+                id: users[0].user_id,
+                username: users[0].username,
+                email: users[0].email,
+                theme_pref: users[0].theme_pref
+            }
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// -- Spotify Credentials --
+// --- Spotify Credentials (now server-side from .env, this is a no-op kept for frontend compat) ---
 app.post('/api/settings/spotify', authenticateUser, async (req, res) => {
-    const { client_id, client_secret } = req.body;
-    const user_id = req.user.user_id;
-
-    if (!client_id || !client_secret) {
-        return res.status(400).json({ error: "Missing Client ID or Secret" });
-    }
-
-    try {
-        await supabase.from('user_oauth_tokens').delete().eq('user_id', user_id);
-
-        const { error } = await supabase
-            .from('user_oauth_tokens')
-            .insert([{ user_id, client_id, client_secret }]);
-
-        if (error) throw error;
-        res.json({ message: "Spotify credentials saved" });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    // Credentials are now in .env, this endpoint just acknowledges
+    res.json({ message: "Spotify credentials are configured on the server." });
 });
 
-// Update Theme Preference
+// --- Update Theme Preference ---
 app.put('/api/settings/theme', authenticateUser, async (req, res) => {
     const { theme_pref } = req.body;
     const user_id = req.user.user_id;
@@ -192,12 +237,12 @@ app.put('/api/settings/theme', authenticateUser, async (req, res) => {
     }
 });
 
-// -- Blocked Entities (Use Case 15) --
+// --- Blocked Entities ---
 app.get('/api/blocks', authenticateUser, async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('blocked_entities')
-            .select('*')
+            .select('block_id, entity_type, entity_value, created_at')
             .eq('user_id', req.user.user_id)
             .order('created_at', { ascending: false });
 
@@ -238,7 +283,7 @@ app.delete('/api/blocks/:id', authenticateUser, async (req, res) => {
             .from('blocked_entities')
             .delete()
             .eq('block_id', req.params.id)
-            .eq('user_id', req.user.user_id); // ensure users only delete their own blocks
+            .eq('user_id', req.user.user_id);
 
         if (error) throw error;
         res.json({ message: "Block removed" });
@@ -247,12 +292,12 @@ app.delete('/api/blocks/:id', authenticateUser, async (req, res) => {
     }
 });
 
-// -- Notifications (Use Case 6) --
+// --- Notifications ---
 app.get('/api/notifications', authenticateUser, async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('notifications')
-            .select('*')
+            .select('notification_id, type, message, is_read, created_at')
             .eq('user_id', req.user.user_id)
             .order('created_at', { ascending: false });
 
@@ -278,13 +323,13 @@ app.post('/api/notifications/:id/read', authenticateUser, async (req, res) => {
     }
 });
 
-// -- Playlists & Collaboration (Use Case 5) --
+// --- Playlists & Collaboration ---
 app.get('/api/playlists', authenticateUser, async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('playlists')
-            .select('*')
-            .eq('user_id', req.user.user_id)
+            .select('playlist_id, name, description, is_collaborative, created_at')
+            .eq('creator_id', req.user.user_id)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -305,7 +350,7 @@ app.post('/api/playlists', authenticateUser, async (req, res) => {
         const { error } = await supabase
             .from('playlists')
             .insert([{
-                user_id: req.user.user_id,
+                creator_id: req.user.user_id,
                 name,
                 description,
                 is_collaborative: false,
@@ -321,7 +366,7 @@ app.post('/api/playlists', authenticateUser, async (req, res) => {
 
 app.post('/api/playlists/:id/invite', authenticateUser, async (req, res) => {
     const playlistId = req.params.id;
-    const { identifier } = req.body; // email or username
+    const { identifier } = req.body;
 
     if (!identifier) {
         return res.status(400).json({ error: "User identifier required" });
@@ -368,7 +413,7 @@ app.post('/api/playlists/:id/invite', authenticateUser, async (req, res) => {
             .insert([{
                 user_id: targetUserId,
                 type: 'SYSTEM',
-                message: `You have been invited to collaborate on a playlist by someone.`,
+                message: 'You have been invited to collaborate on a playlist.',
                 is_read: false,
                 created_at: new Date().toISOString()
             }]);
@@ -379,7 +424,7 @@ app.post('/api/playlists/:id/invite', authenticateUser, async (req, res) => {
     }
 });
 
-// -- Social System (Search & Friends) --
+// --- Social System (Search & Friends) ---
 app.get('/api/users/search', authenticateUser, async (req, res) => {
     const { q } = req.query;
     if (!q) return res.json({ users: [] });
@@ -401,10 +446,9 @@ app.get('/api/users/search', authenticateUser, async (req, res) => {
 
 app.get('/api/friends', authenticateUser, async (req, res) => {
     try {
-        // Find where user is person 1 or person 2
         const { data, error } = await supabase
             .from('friendships')
-            .select('*, user1:user_id_1(username), user2:user_id_2(username)')
+            .select('friend_id, user_id_1, user_id_2, status, requester_id, user1:user_id_1(username), user2:user_id_2(username)')
             .or(`user_id_1.eq.${req.user.user_id},user_id_2.eq.${req.user.user_id}`);
 
         if (error) throw error;
@@ -427,7 +471,7 @@ app.post('/api/friends/request', authenticateUser, async (req, res) => {
     try {
         const { data: existing } = await supabase
             .from('friendships')
-            .select('*')
+            .select('friend_id')
             .eq('user_id_1', u1)
             .eq('user_id_2', u2);
 
@@ -445,7 +489,7 @@ app.post('/api/friends/request', authenticateUser, async (req, res) => {
         await supabase.from('notifications').insert([{
             user_id: target_user_id,
             type: 'FRIEND_REQUEST',
-            message: `You received a friend request!`,
+            message: 'You received a friend request!',
             is_read: false
         }]);
 
@@ -462,7 +506,7 @@ app.post('/api/friends/accept', authenticateUser, async (req, res) => {
             .from('friendships')
             .update({ status: 'ACCEPTED' })
             .eq('friend_id', friend_id)
-            .eq('user_id_2', req.user.user_id); // Only the receiver can accept
+            .eq('user_id_2', req.user.user_id);
 
         if (error) throw error;
         res.json({ message: "Friend request accepted" });
@@ -486,60 +530,39 @@ app.delete('/api/friends/:id', authenticateUser, async (req, res) => {
     }
 });
 
+// --- Spotify Status ---
 app.get('/api/spotify/status', authenticateUser, async (req, res) => {
-    try {
-        const { data, error } = await supabase
-            .from('user_oauth_tokens')
-            .select('client_id')
-            .eq('user_id', req.user.user_id)
-            .maybeSingle();
-
-        if (error) throw error;
-        res.json({ configured: !!data });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    const hasServerCreds = !!(SPOTIFY_CLIENT_ID && SPOTIFY_CLIENT_SECRET);
+    const hasUserTokens = spotifyTokens.has(req.user.user_id);
+    res.json({ configured: hasServerCreds, connected: hasUserTokens });
 });
 
-// -- Spotify Live Integration --
+// --- Spotify Auth URL ---
 app.get('/api/spotify/auth-url', authenticateUser, async (req, res) => {
-    try {
-        const { data, error } = await supabase
-            .from('user_oauth_tokens')
-            .select('client_id')
-            .eq('user_id', req.user.user_id)
-            .single();
-
-        if (error || !data) return res.status(400).json({ error: "Spotify Client ID not found in settings" });
-
-        const scope = 'user-read-currently-playing user-read-playback-state';
-        const url = 'https://accounts.spotify.com/authorize?' +
-            querystring.stringify({
-                response_type: 'code',
-                client_id: data.client_id,
-                scope: scope,
-                redirect_uri: REDIRECT_URI,
-                state: req.user.user_id // Pass user_id as state
-            });
-
-        res.json({ url });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+    if (!SPOTIFY_CLIENT_ID) {
+        return res.status(400).json({ error: "Spotify Client ID not configured on server" });
     }
+
+    const scope = 'user-read-currently-playing user-read-playback-state user-top-read user-read-recently-played playlist-read-private playlist-read-collaborative';
+    const url = 'https://accounts.spotify.com/authorize?' +
+        querystring.stringify({
+            response_type: 'code',
+            client_id: SPOTIFY_CLIENT_ID,
+            scope: scope,
+            redirect_uri: REDIRECT_URI,
+            state: req.user.user_id
+        });
+
+    res.json({ url });
 });
 
+// --- Spotify OAuth Callback ---
 app.get('/spotify/callback', async (req, res) => {
     const { code, state: user_id } = req.query;
 
     if (!code) return res.redirect('/settings.html?error=no_code');
 
     try {
-        const { data: creds } = await supabase
-            .from('user_oauth_tokens')
-            .select('client_id, client_secret')
-            .eq('user_id', user_id)
-            .single();
-
         const tokenRes = await axios.post('https://accounts.spotify.com/api/token',
             querystring.stringify({
                 grant_type: 'authorization_code',
@@ -547,7 +570,7 @@ app.get('/spotify/callback', async (req, res) => {
                 redirect_uri: REDIRECT_URI
             }), {
             headers: {
-                'Authorization': 'Basic ' + (Buffer.from(creds.client_id + ':' + creds.client_secret).toString('base64')),
+                'Authorization': 'Basic ' + Buffer.from(SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).toString('base64'),
                 'Content-Type': 'application/x-www-form-urlencoded'
             }
         });
@@ -555,14 +578,9 @@ app.get('/spotify/callback', async (req, res) => {
         const { access_token, refresh_token, expires_in } = tokenRes.data;
         const expires_at = new Date(Date.now() + expires_in * 1000).toISOString();
 
-        await supabase
-            .from('user_oauth_tokens')
-            .update({
-                access_token,
-                refresh_token,
-                expires_at
-            })
-            .eq('user_id', user_id);
+        // Store tokens in memory
+        spotifyTokens.set(user_id, { access_token, refresh_token, expires_at });
+        console.log(`Spotify connected for user ${user_id}`);
 
         res.redirect('/settings.html?success=spotify_connected');
     } catch (err) {
@@ -571,35 +589,11 @@ app.get('/spotify/callback', async (req, res) => {
     }
 });
 
+// --- Spotify Currently Playing (with device info) ---
 app.get('/api/spotify/currently-playing', authenticateUser, async (req, res) => {
     try {
-        const { data: creds, error: credError } = await supabase
-            .from('user_oauth_tokens')
-            .select('*')
-            .eq('user_id', req.user.user_id)
-            .single();
-
-        if (credError || !creds.refresh_token) {
-            return res.status(401).json({ error: "Spotify not connected" });
-        }
-
-        let token = creds.access_token;
-        if (new Date(creds.expires_at) <= new Date()) {
-            // Refresh token
-            const refreshRes = await axios.post('https://accounts.spotify.com/api/token',
-                querystring.stringify({
-                    grant_type: 'refresh_token',
-                    refresh_token: creds.refresh_token
-                }), {
-                headers: {
-                    'Authorization': 'Basic ' + (Buffer.from(creds.client_id + ':' + creds.client_secret).toString('base64')),
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                }
-            });
-            token = refreshRes.data.access_token;
-            const expires_at = new Date(Date.now() + refreshRes.data.expires_in * 1000).toISOString();
-            await supabase.from('user_oauth_tokens').update({ access_token: token, expires_at }).eq('user_id', req.user.user_id);
-        }
+        const { error: tokenError, token } = await getValidSpotifyToken(req.user.user_id);
+        if (tokenError) return res.json({ playing: false });
 
         const spotifyRes = await axios.get('https://api.spotify.com/v1/me/player/currently-playing', {
             headers: { 'Authorization': `Bearer ${token}` }
@@ -610,66 +604,168 @@ app.get('/api/spotify/currently-playing', authenticateUser, async (req, res) => 
         }
 
         const track = spotifyRes.data.item;
+
+        // Also fetch active devices for richer info
+        let deviceName = 'Unknown Device';
+        let deviceType = 'unknown';
+        try {
+            const devicesRes = await axios.get('https://api.spotify.com/v1/me/player/devices', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const active = devicesRes.data.devices?.find(d => d.is_active);
+            if (active) {
+                deviceName = active.name;
+                deviceType = active.type?.toLowerCase() || 'unknown';
+            }
+        } catch (e) { /* device info is optional */ }
+
+        const progress = spotifyRes.data.progress_ms || 0;
+        const duration = track.duration_ms || 1;
+
         res.json({
             playing: true,
             title: track.name,
             artist: track.artists.map(a => a.name).join(', '),
             album: track.album.name,
             album_art: track.album.images[0]?.url,
-            progress_ms: spotifyRes.data.progress_ms,
-            duration_ms: track.duration_ms
+            progress_ms: progress,
+            duration_ms: duration,
+            progress_pct: Math.round((progress / duration) * 100),
+            device_name: deviceName,
+            device_type: deviceType,
+            is_playing: spotifyRes.data.is_playing
         });
     } catch (err) {
+        res.json({ playing: false });
+    }
+});
+
+// --- User's Spotify Playlists ---
+app.get('/api/spotify/playlists', authenticateUser, async (req, res) => {
+    try {
+        const { error: tokenError, token } = await getValidSpotifyToken(req.user.user_id);
+        if (tokenError) return res.status(401).json({ error: tokenError });
+
+        const spotifyRes = await axios.get('https://api.spotify.com/v1/me/playlists', {
+            headers: { 'Authorization': `Bearer ${token}` },
+            params: { limit: 20 }
+        });
+
+        const playlists = spotifyRes.data.items.map(pl => ({
+            id: pl.id,
+            name: pl.name,
+            description: pl.description || '',
+            image: pl.images?.[0]?.url || null,
+            track_count: pl.tracks?.total || 0,
+            owner: pl.owner?.display_name || 'Unknown',
+            external_url: pl.external_urls?.spotify || null,
+            is_collaborative: pl.collaborative
+        }));
+
+        res.json({ playlists });
+    } catch (err) {
+        console.error("Spotify Playlists Error:", err.response?.data || err.message);
         res.status(500).json({ error: err.message });
     }
 });
-app.get('/api/spotify/trending', authenticateUser, async (req, res) => {
+
+// --- Playlist Tracks ---
+app.get('/api/spotify/playlists/:playlistId/tracks', authenticateUser, async (req, res) => {
     try {
-        const { data: creds, error: credError } = await supabase
-            .from('user_oauth_tokens')
-            .select('*')
-            .eq('user_id', req.user.user_id)
-            .single();
+        const { error: tokenError, token } = await getValidSpotifyToken(req.user.user_id);
+        if (tokenError) return res.status(401).json({ error: tokenError });
 
-        if (credError || !creds.refresh_token) {
-            return res.status(401).json({ error: "Spotify not connected" });
-        }
-
-        let token = creds.access_token;
-        if (new Date(creds.expires_at) <= new Date()) {
-            const refreshRes = await axios.post('https://accounts.spotify.com/api/token',
-                querystring.stringify({
-                    grant_type: 'refresh_token',
-                    refresh_token: creds.refresh_token
-                }), {
-                headers: {
-                    'Authorization': 'Basic ' + (Buffer.from(creds.client_id + ':' + creds.client_secret).toString('base64')),
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                }
-            });
-            token = refreshRes.data.access_token;
-            const expires_at = new Date(Date.now() + refreshRes.data.expires_in * 1000).toISOString();
-            await supabase.from('user_oauth_tokens').update({ access_token: token, expires_at }).eq('user_id', req.user.user_id);
-        }
-
-        // Global Top 50 Playlist ID: 37i9dQZEVXbMDoHDwVN2tF
-        const playlistId = '37i9dQZEVXbMDoHDwVN2tF';
-        const spotifyRes = await axios.get(`https://api.spotify.com/v1/playlists/${playlistId}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+        const spotifyRes = await axios.get(`https://api.spotify.com/v1/playlists/${req.params.playlistId}/tracks`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+            params: { limit: 50, fields: 'items(track(name,artists(name),album(name,images),duration_ms,external_urls))' }
         });
 
-        const tracks = spotifyRes.data.tracks.items.slice(0, 10).map(item => ({
-            id: item.track.id,
-            title: item.track.name,
-            artist: item.track.artists.map(a => a.name).join(', '),
-            album: item.track.album.name,
-            album_art: item.track.album.images[0]?.url,
-            uri: item.track.uri
-        }));
+        const tracks = spotifyRes.data.items
+            .filter(item => item.track)
+            .map(item => ({
+                name: item.track.name,
+                artist: item.track.artists.map(a => a.name).join(', '),
+                album: item.track.album.name,
+                image: item.track.album.images?.[2]?.url || item.track.album.images?.[0]?.url || null,
+                duration_ms: item.track.duration_ms,
+                external_url: item.track.external_urls?.spotify || null
+            }));
 
         res.json({ tracks });
     } catch (err) {
-        console.error("Spotify Trending Error:", err.response?.data || err.message);
+        console.error("Playlist Tracks Error:", err.response?.data || err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- Analytics (Real Spotify Data) ---
+app.get('/api/analytics', authenticateUser, async (req, res) => {
+    const timeframe = req.query.timeframe || 'short_term';
+    const validTimeframes = ['short_term', 'medium_term', 'long_term'];
+    if (!validTimeframes.includes(timeframe)) {
+        return res.status(400).json({ error: "Invalid timeframe. Use short_term, medium_term, or long_term." });
+    }
+
+    try {
+        const { error: tokenError, token } = await getValidSpotifyToken(req.user.user_id);
+        if (tokenError) return res.status(401).json({ error: tokenError });
+
+        const [artistsRes, tracksRes, recentRes] = await Promise.all([
+            axios.get('https://api.spotify.com/v1/me/top/artists', {
+                headers: { 'Authorization': `Bearer ${token}` },
+                params: { time_range: timeframe, limit: 10 }
+            }),
+            axios.get('https://api.spotify.com/v1/me/top/tracks', {
+                headers: { 'Authorization': `Bearer ${token}` },
+                params: { time_range: timeframe, limit: 10 }
+            }),
+            axios.get('https://api.spotify.com/v1/me/player/recently-played', {
+                headers: { 'Authorization': `Bearer ${token}` },
+                params: { limit: 10 }
+            }).catch(() => ({ data: { items: [] } }))
+        ]);
+
+        const artists = artistsRes.data.items.map(a => ({
+            name: a.name,
+            image: a.images?.[1]?.url || a.images?.[0]?.url || null,
+            genres: (a.genres || []).slice(0, 3)
+        }));
+
+        const tracks = tracksRes.data.items.map(t => ({
+            name: t.name,
+            artist: t.artists.map(a => a.name).join(', '),
+            album: t.album.name,
+            image: t.album.images?.[1]?.url || t.album.images?.[0]?.url || null,
+            duration_ms: t.duration_ms
+        }));
+
+        const recent = recentRes.data.items.map(i => ({
+            name: i.track.name,
+            artist: i.track.artists.map(a => a.name).join(', '),
+            played_at: i.played_at,
+            image: i.track.album.images?.[2]?.url || i.track.album.images?.[0]?.url || null
+        }));
+
+        const genreCounts = {};
+        artists.forEach(a => {
+            (a.genres || []).forEach(g => {
+                genreCounts[g] = (genreCounts[g] || 0) + 1;
+            });
+        });
+        const topGenre = Object.entries(genreCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Unknown';
+
+        res.json({
+            genre: topGenre !== 'Unknown' ? topGenre : null,
+            top_artist: artists[0]?.name || null,
+            top_track: tracks[0]?.name || null,
+            top_track_artist: tracks[0]?.artist || null,
+            track_count: tracks.length,
+            artists,
+            tracks,
+            recent
+        });
+    } catch (err) {
+        console.error("Analytics Error:", err.response?.data || err.message);
         res.status(500).json({ error: err.message });
     }
 });

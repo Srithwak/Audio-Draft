@@ -11,111 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <style>
-        .layout {
-            display: flex;
-            min-height: 100vh;
-            background-color: var(--bg-primary);
-        }
-
-        .sidebar {
-            width: 250px;
-            background-color: var(--bg-secondary);
-            border-right: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            padding: 24px 0;
-        }
-
-        .sidebar__logo {
-            padding: 0 24px 32px 24px;
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .sidebar__nav {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .sidebar__link {
-            padding: 12px 24px;
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-weight: 500;
-            transition: color 0.2s, background-color 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .sidebar__link:hover,
-        .sidebar__link.active {
-            color: var(--text-primary);
-            background-color: rgba(255, 255, 255, 0.05);
-        }
-
-        .sidebar__link.active {
-            border-right: 3px solid var(--accent-purple);
-        }
-
-        .sidebar__footer {
-            padding: 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .user-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: var(--gradient-primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            color: white;
-        }
-
-        .main-view {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
-        }
-
-        .topbar {
-            height: 72px;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 48px;
-            background-color: rgba(13, 13, 18, 0.8);
-            backdrop-filter: blur(12px);
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-
-        .page-content {
-            padding: 48px;
-            max-width: 800px;
-            margin: 0 auto;
-            width: 100%;
-        }
+        .page-content { max-width: 800px; }
 
         .notification-list {
             display: flex;
@@ -160,7 +56,6 @@
 
 <body>
     <div class="layout">
-        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar__logo">
                 <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
@@ -169,7 +64,6 @@
                 </svg>
                 Audio-Draft2
             </div>
-
             <nav class="sidebar__nav">
                 <a href="dashboard.html" class="sidebar__link">Dashboard</a>
                 <a href="social.html" class="sidebar__link">Social</a>
@@ -177,7 +71,6 @@
                 <a href="analytics.html" class="sidebar__link">Analytics</a>
                 <a href="settings.html" class="sidebar__link">Settings</a>
             </nav>
-
             <div class="sidebar__footer">
                 <div class="user-info">
                     <div class="user-avatar" id="nav-avatar">?</div>
@@ -189,7 +82,6 @@
             </div>
         </aside>
 
-        <!-- Main Content -->
         <main class="main-view">
             <header class="topbar">
                 <div class="topbar__title">Notifications</div>
@@ -200,8 +92,7 @@
             </header>
 
             <div class="page-content">
-                <div class="dashboard-header"
-                    style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px;">
                     <div>
                         <h1 style="font-size: 2rem; margin-bottom: 8px;">Activity</h1>
                         <p style="color: var(--text-secondary);">Updates and playlist invitations from your network.</p>
@@ -210,7 +101,6 @@
                 </div>
 
                 <div class="notification-list" id="notifications-container">
-                    <!-- Notifications JS injected here -->
                     <div class="notification-card" style="justify-content: center; color: var(--text-secondary);">
                         Loading notifications...
                     </div>
@@ -271,7 +161,6 @@
                         container.appendChild(card);
                     });
 
-                    // Update global badge
                     if (badge) {
                         if (unreadCount > 0) {
                             badge.textContent = unreadCount;
@@ -281,7 +170,6 @@
                         }
                     }
 
-                    // Attach read handlers
                     document.querySelectorAll(".mark-read-btn").forEach(btn => {
                         btn.addEventListener("click", async (e) => {
                             const notifId = e.target.getAttribute("data-id");

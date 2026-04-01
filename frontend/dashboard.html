@@ -11,255 +11,129 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <style>
-        .layout {
-            display: flex;
-            min-height: 100vh;
-            background-color: var(--bg-primary);
-        }
-
-        .sidebar {
-            width: 250px;
-            background-color: var(--bg-secondary);
-            border-right: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            padding: 24px 0;
-        }
-
-        .sidebar__logo {
-            padding: 0 24px 32px 24px;
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .sidebar__nav {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .sidebar__link {
-            padding: 12px 24px;
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-weight: 500;
-            transition: color 0.2s, background-color 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .sidebar__link:hover,
-        .sidebar__link.active {
-            color: var(--text-primary);
-            background-color: rgba(255, 255, 255, 0.05);
-        }
-
-        .sidebar__link.active {
-            border-right: 3px solid var(--accent-purple);
-        }
-
-        .sidebar__footer {
-            padding: 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .user-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: var(--gradient-primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            color: white;
-        }
-
-        .main-view {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
-        }
-
-        .topbar {
-            height: 72px;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 48px;
-            background-color: rgba(13, 13, 18, 0.8);
-            backdrop-filter: blur(12px);
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-
-        .page-content {
-            padding: 48px;
-            max-width: 1200px;
-            margin: 0 auto;
-            width: 100%;
-        }
-
-        .dashboard-header {
-            margin-bottom: 32px;
-        }
-
-        .dashboard-header h1 {
-            font-size: 2rem;
-            margin-bottom: 8px;
-        }
-
-        .dashboard-header p {
-            color: var(--text-secondary);
-        }
-
-
-
-        /* Now Playing Card */
-        #now-playing-container {
-            margin-bottom: 24px;
-        }
+        .dashboard-header { margin-bottom: 32px; }
+        .dashboard-header h1 { font-size: 2rem; margin-bottom: 8px; }
+        .dashboard-header p { color: var(--text-secondary); }
 
         .now-playing-card {
             display: flex;
             align-items: center;
-            gap: 16px;
-            background: rgba(255, 255, 255, 0.03);
+            gap: 20px;
+            background: linear-gradient(135deg, rgba(167,139,250,0.08), rgba(59,130,246,0.05));
             border: 1px solid var(--border-color);
-            padding: 16px;
-            border-radius: 12px;
+            padding: 24px;
+            border-radius: 16px;
             animation: fadeIn 0.5s ease-out;
         }
 
         .now-playing-card__art {
-            width: 64px;
-            height: 64px;
+            width: 80px;
+            height: 80px;
             border-radius: 8px;
             object-fit: cover;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+            flex-shrink: 0;
         }
+
+        .now-playing-card__info { flex: 1; min-width: 0; }
 
         .now-playing-card__title {
             font-weight: 700;
+            font-size: 1.15rem;
             color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .now-playing-card__artist {
             font-size: 0.9rem;
             color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .now-playing-card__album {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            opacity: 0.7;
+            margin-top: 2px;
+        }
+
+        .now-playing-card__device {
+            font-size: 0.75rem;
+            color: var(--accent-purple);
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            margin-top: 12px;
+            overflow: hidden;
+        }
+
+        .progress-track__fill {
+            height: 100%;
+            background: var(--accent-purple);
+            border-radius: 2px;
+            transition: width 1s linear;
+        }
+
+        .now-playing-card__time {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 64px 24px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state__icon { font-size: 3rem; margin-bottom: 16px; opacity: 0.4; }
+        .empty-state h3 { margin-bottom: 8px; color: var(--text-primary); }
+
+        .playing-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(74,222,128,0.15);
+            color: #4ade80;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .playing-badge__dot {
+            width: 6px; height: 6px;
+            background: #4ade80;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
         }
 
         @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Trending Section */
-        .trending-section {
-            margin-top: 48px;
-        }
-
-        .trending-section h2 {
-            font-size: 1.5rem;
-            margin-bottom: 24px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .trending-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 24px;
-        }
-
-        .track-card {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 16px;
-            transition: all 0.3s ease;
-            cursor: pointer;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .track-card:hover {
-            background: rgba(255, 255, 255, 0.06);
-            transform: translateY(-4px);
-            border-color: var(--accent-purple);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-        }
-
-        .track-card__art {
-            width: 100%;
-            aspect-ratio: 1/1;
-            border-radius: 8px;
-            margin-bottom: 12px;
-            object-fit: cover;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        }
-
-        .track-card__title {
-            font-weight: 700;
-            font-size: 0.95rem;
-            color: var(--text-primary);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            margin-bottom: 4px;
-        }
-
-        .track-card__artist {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .track-card__badge {
-            position: absolute;
-            top: 24px;
-            right: 24px;
-            background: var(--accent-purple);
-            color: white;
-            font-size: 0.7rem;
-            font-weight: 700;
-            padding: 2px 8px;
-            border-radius: 4px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
         }
     </style>
 </head>
 
 <body>
     <div class="layout">
-        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar__logo">
                 <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
@@ -268,7 +142,6 @@
                 </svg>
                 Audio-Draft2
             </div>
-
             <nav class="sidebar__nav">
                 <a href="dashboard.html" class="sidebar__link active">Dashboard</a>
                 <a href="social.html" class="sidebar__link">Social</a>
@@ -276,22 +149,18 @@
                 <a href="analytics.html" class="sidebar__link">Analytics</a>
                 <a href="settings.html" class="sidebar__link">Settings</a>
             </nav>
-
             <div class="sidebar__footer">
                 <div class="user-info">
                     <div class="user-avatar" id="nav-avatar">?</div>
-                    <div>
-                        <div style="font-weight: 600;" id="nav-username">Loading...</div>
-                    </div>
+                    <div><div style="font-weight: 600;" id="nav-username">Loading...</div></div>
                 </div>
                 <button class="btn btn--dark" id="logout-btn" style="width: 100%; margin-top: 12px;">Sign Out</button>
             </div>
         </aside>
 
-        <!-- Main Content -->
         <main class="main-view">
             <header class="topbar">
-                <div class="topbar__title">Overview</div>
+                <div class="topbar__title">Dashboard</div>
                 <div class="topbar__actions">
                     <a href="notifications.html" class="btn btn--dark">Notifications <span id="notif-badge"
                             style="background: var(--accent-red); color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.8rem; margin-left: 4px; display: none;">0</span></a>
@@ -301,38 +170,21 @@
             <div class="page-content">
                 <div class="dashboard-header">
                     <h1 id="welcome-msg">Welcome back</h1>
-                    <p>Here's what you've been listening to lately.</p>
+                    <p>Here's what's playing right now.</p>
                 </div>
 
                 <div id="now-playing-container">
-                    <!-- Loaded via JS -->
-                </div>
-
-                <section class="trending-section">
-                    <h2>
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="12" y1="8" x2="12" y2="12"></line>
-                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                        </svg>
-                        Discover
-                    </h2>
-                    <div id="discover-container" class="trending-grid">
-                        <!-- Loaded via JS -->
-                        <p class="text-muted">Loading trending songs...</p>
+                    <div class="empty-state">
+                        <div class="empty-state__icon">🎧</div>
+                        <h3>Checking Spotify...</h3>
+                        <p>Loading your current playback.</p>
                     </div>
-                </section>
+                </div>
             </div>
         </main>
     </div>
 
-
-
     <script src="js/main.js"></script>
-    <script>
-
-    </script>
 </body>
 
 </html>

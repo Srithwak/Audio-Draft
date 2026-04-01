@@ -1,5 +1,20 @@
+require('dotenv').config({ path: './database/.env' });
 const express = require('express');
 const SpotifyWebApi = require('spotify-web-api-node');
+
+// const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
+// const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
+
+const SPOTIFY_CLIENT_ID = "de6472af99064239960e491418bb85b5";
+const SPOTIFY_CLIENT_SECRET = "4c20ea7d89c4420ca97e430d3f810280";
+
+if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
+    console.error("FATAL: Missing SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET in database/.env");
+    console.error("Add these lines to database/.env:");
+    console.error('  SPOTIFY_CLIENT_ID="your_client_id_here"');
+    console.error('  SPOTIFY_CLIENT_SECRET="your_client_secret_here"');
+    process.exit(1);
+}
 
 const scopes = [
     'user-read-private',
@@ -9,8 +24,8 @@ const scopes = [
 ];
 
 const spotifyApi = new SpotifyWebApi({
-    clientId: 'de6472af99064239960e491418bb85b5',
-    clientSecret: '4c20ea7d89c4420ca97e430d3f810280',
+    clientId: SPOTIFY_CLIENT_ID,
+    clientSecret: SPOTIFY_CLIENT_SECRET,
     redirectUri: 'http://127.0.0.1:5001/spotify/callback'
 });
 
@@ -42,13 +57,11 @@ app.get('/spotify/callback', async (req, res) => {
         const access_token = data.body['access_token'];
         const refresh_token = data.body['refresh_token'];
 
-        // Set the access token on the API object to use it in later calls
         spotifyApi.setAccessToken(access_token);
         spotifyApi.setRefreshToken(refresh_token);
 
         res.send('Success! You can now close this window and look at your terminal.');
 
-        // Execute the queries
         await runSpotifyTests();
         process.exit(0);
 
@@ -60,13 +73,11 @@ app.get('/spotify/callback', async (req, res) => {
 
 async function runSpotifyTests() {
     try {
-        // ── Profile ──────────────────────────────────────────────────
         const me = await spotifyApi.getMe();
         pretty("USER PROFILE", me.body);
 
         const timeRanges = ['short_term', 'medium_term', 'long_term'];
 
-        // ── Top Artists (short / medium / long term) ─────────────────
         for (const timeRange of timeRanges) {
             const topArtists = await spotifyApi.getMyTopArtists({ limit: 10, time_range: timeRange });
             pretty(`TOP ARTISTS — ${timeRange}`, topArtists.body.items.map(a => ({
@@ -76,7 +87,6 @@ async function runSpotifyTests() {
             })));
         }
 
-        // ── Top Tracks (short / medium / long term) ──────────────────
         for (const timeRange of timeRanges) {
             const topTracks = await spotifyApi.getMyTopTracks({ limit: 10, time_range: timeRange });
             pretty(`TOP TRACKS — ${timeRange}`, topTracks.body.items.map(t => ({
@@ -86,7 +96,6 @@ async function runSpotifyTests() {
             })));
         }
 
-        // ── Recently Played ──────────────────────────────────────────
         const recent = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 20 });
         pretty("RECENTLY PLAYED", recent.body.items.map(i => ({
             name: i.track.name,
@@ -94,7 +103,6 @@ async function runSpotifyTests() {
             played_at: i.played_at
         })));
 
-        // ── Currently Playing ────────────────────────────────────────
         const current = await spotifyApi.getMyCurrentPlaybackState();
         if (current.body && current.body.item) {
             pretty("CURRENTLY PLAYING", {

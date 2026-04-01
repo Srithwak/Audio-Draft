@@ -15,7 +15,9 @@ CREATE TABLE IF NOT EXISTS User_OAuth_Tokens (
     user_id UUID REFERENCES Users(user_id) ON DELETE CASCADE,
     client_id VARCHAR(255),
     client_secret VARCHAR(255),
+    access_token TEXT,
     refresh_token VARCHAR(255),
+    expires_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

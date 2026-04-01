@@ -2,6 +2,14 @@
  * Audio-Draft2 — Client-Side Utilities
  */
 
+// --- XSS Protection ---
+function sanitize(str) {
+    if (str == null) return '';
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(String(str)));
+    return div.innerHTML;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     initTheme();
     initFlashAutoDismiss();
@@ -43,13 +51,10 @@ function checkAuthState() {
     const userData = localStorage.getItem('audioDraftUser');
 
     if (!userData && !isAuthPage) {
-        // Not logged in and trying to access a protected page
         window.location.href = 'login.html';
     } else if (userData && isAuthPage) {
-        // Logged in but trying to access login/register
         window.location.href = 'dashboard.html';
     } else if (userData && !isAuthPage) {
-        // Update UI with user info
         const user = JSON.parse(userData);
         const usernameEl = document.getElementById('nav-username');
         const avatarEl = document.getElementById('nav-avatar');
@@ -59,9 +64,8 @@ function checkAuthState() {
         if (avatarEl) avatarEl.textContent = user.username.charAt(0).toUpperCase();
         if (welcomeEl) welcomeEl.textContent = `Welcome back, ${user.username}`;
 
-        // Match theme if user has preference
         if (user.theme_pref) {
-            setTheme(user.theme_pref, false); // Don't sync back if we just loaded it
+            setTheme(user.theme_pref, false);
         }
     }
 }
@@ -108,11 +112,9 @@ function setTheme(theme, sync = true) {
     }
     localStorage.setItem('audioDraftTheme', theme);
 
-    // Sync with DB if logged in and requested
     const userData = localStorage.getItem('audioDraftUser');
     if (userData && sync) {
         const user = JSON.parse(userData);
-        // Update local session data too
         user.theme_pref = theme;
         localStorage.setItem('audioDraftUser', JSON.stringify(user));
 
@@ -122,7 +124,6 @@ function setTheme(theme, sync = true) {
         }).catch(err => console.error("Failed to sync theme:", err));
     }
 
-    // Update toggle switch if it exists
     const themeToggle = document.getElementById('theme-toggle');
     if (themeToggle) {
         themeToggle.checked = (theme === 'light');
@@ -215,7 +216,6 @@ function initAuthForms() {
 
                 const data = await response.json();
                 if (response.ok) {
-                    // Registration success, log them in or redirect them to login
                     localStorage.setItem('audioDraftUser', JSON.stringify(data.user));
                     if (data.user.theme_pref) {
                         setTheme(data.user.theme_pref, false);
@@ -257,7 +257,6 @@ function initFormValidation() {
             });
         });
 
-        // Password match validation
         const password = form.querySelector("#password");
         const confirm = form.querySelector("#confirm_password");
 
@@ -305,7 +304,6 @@ function validateInput(input) {
         }
     }
 
-    // Spotify credential validation
     if (id === "client_id") {
         if (!/^[a-f0-9]{32}$/i.test(value)) {
             showInputError(input, "Client ID must be a 32-character hex string");
@@ -327,7 +325,6 @@ function showInputError(input, message) {
     const group = input.closest(".form-group");
     if (!group) return;
 
-    // Remove existing errors
     const existing = group.querySelectorAll(".form-error--client");
     existing.forEach((el) => el.remove());
 
@@ -351,21 +348,16 @@ function clearInputError(input) {
     existing.forEach((el) => el.remove());
 }
 
-
-/* ── Dashboard & Spotify Live Logic ───────────────────────────────────────── */
+/* ── Dashboard — Now Playing Only ─────────────────────────────────────────── */
 async function initDashboard() {
     updateNowPlaying();
+    setInterval(updateNowPlaying, 30000);
+}
 
-    const isConfigured = await checkSpotifyStatus();
-    if (isConfigured) {
-        updateTrendingSongs();
-    } else {
-        const container = document.getElementById('discover-container');
-        if (container) container.innerHTML = '<p class="text-muted">Connect Spotify in Settings to see trending tracks.</p>';
-    }
-
-    // Poll every 40 seconds
-    setInterval(updateNowPlaying, 40000);
+function formatMs(ms) {
+    const m = Math.floor(ms / 60000);
+    const s = Math.floor((ms % 60000) / 1000).toString().padStart(2, '0');
+    return `${m}:${s}`;
 }
 
 async function updateNowPlaying() {
@@ -377,60 +369,51 @@ async function updateNowPlaying() {
         const data = await response.json();
 
         if (data.playing) {
+            const artHtml = data.album_art
+                ? `<img class="now-playing-card__art" src="${sanitize(data.album_art)}" alt="Album art">`
+                : `<div class="now-playing-card__art" style="background: rgba(255,255,255,0.05);"></div>`;
+
+            const statusBadge = data.is_playing
+                ? `<div class="playing-badge"><div class="playing-badge__dot"></div>Now Playing</div>`
+                : `<div class="playing-badge" style="background: rgba(250,204,21,0.15); color: #facc15;"><div class="playing-badge__dot" style="background: #facc15;"></div>Paused</div>`;
+
+            const deviceIcon = data.device_type === 'smartphone' ? '📱'
+                : data.device_type === 'computer' ? '💻'
+                : data.device_type === 'speaker' ? '🔊' : '🎧';
+
             container.innerHTML = `
-                <div class="now-playing-card">
-                    <div class="now-playing-card__art" style="background: rgba(255,255,255,0.05);"></div>
+                ${statusBadge}
+                <div class="now-playing-card" style="margin-top: 16px;">
+                    ${artHtml}
                     <div class="now-playing-card__info">
-                        <div class="now-playing-card__title">${data.title}</div>
-                        <div class="now-playing-card__artist">${data.artist}</div>
+                        <div class="now-playing-card__title">${sanitize(data.title)}</div>
+                        <div class="now-playing-card__artist">${sanitize(data.artist)}</div>
+                        <div class="now-playing-card__album">${sanitize(data.album)}</div>
+                        <div class="now-playing-card__device">${deviceIcon} ${sanitize(data.device_name)}</div>
+                        <div class="progress-track">
+                            <div class="progress-track__fill" style="width: ${data.progress_pct}%"></div>
+                        </div>
+                        <div class="now-playing-card__time">
+                            <span>${formatMs(data.progress_ms)}</span>
+                            <span>${formatMs(data.duration_ms)}</span>
+                        </div>
                     </div>
                 </div>
             `;
         } else {
-            container.innerHTML = `<p class="text-muted">Not listening to anything right now.</p>`;
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state__icon">🎧</div>
+                    <h3>Nothing playing</h3>
+                    <p>Play something on Spotify to see it here.</p>
+                </div>
+            `;
         }
     } catch (err) {
-        console.error("Spotify Polling Error:", err);
+        console.error("Now Playing Error:", err);
     }
 }
 
-async function updateTrendingSongs() {
-    const container = document.getElementById('discover-container');
-    if (!container) return;
-
-    // --- CONVINCING DISCOVER MOCK DATA ---
-    const discoverMock = [
-        { title: "BIRDS OF A FEATHER", artist: "Billie Eilish", uri: "#" },
-        { title: "Not Like Us", artist: "Kendrick Lamar", uri: "#" },
-        { title: "Espresso", artist: "Sabrina Carpenter", uri: "#" },
-        { title: "Houdini", artist: "Eminem", uri: "#" },
-        { title: "Million Dollar Baby", artist: "Tommy Richman", uri: "#" },
-        { title: "Good Luck, Babe!", artist: "Chappell Roan", uri: "#" }
-    ];
-
-    renderTrendingTracks(discoverMock, container);
-
-    /*
-    // --- REAL API DISABLED FOR DEMO ---
-    try {
-        const response = await apiFetch('/api/spotify/trending');
-        ...
-    } catch (err) {
-        console.error("Trending Songs Error:", err);
-    }
-    */
-}
-
-function renderTrendingTracks(tracks, container) {
-    container.innerHTML = tracks.map((track, index) => `
-        <div class="track-card" onclick="window.open('${track.uri}', '_blank')">
-            <div class="track-card__badge">#${index + 1}</div>
-            <div class="track-card__art" style="background: rgba(255,255,255,0.05);"></div>
-            <div class="track-card__title" title="${track.title}">${track.title}</div>
-            <div class="track-card__artist" title="${track.artist}">${track.artist}</div>
-        </div>
-    `).join('');
-}
 
 /* ── Social & Search Logic ────────────────────────────────────────────────── */
 function initSocial() {
@@ -454,10 +437,10 @@ function initSocial() {
                 resultsDiv.innerHTML = data.users.map(u => `
                     <div class="user-card">
                         <div class="user-card__info">
-                            <strong>${u.username}</strong>
-                            <span>${u.email}</span>
+                            <strong>${sanitize(u.username)}</strong>
+                            <span>${sanitize(u.email)}</span>
                         </div>
-                        <button class="btn btn--small btn--dark" onclick="sendFriendRequest('${u.user_id}')">Add Friend</button>
+                        <button class="btn btn--small btn--dark" onclick="sendFriendRequest('${sanitize(u.user_id)}')">Add Friend</button>
                     </div>
                 `).join('');
             } catch (err) {
@@ -496,17 +479,17 @@ async function loadFriendships() {
 
         friendsDiv.innerHTML = accepted.length ? accepted.map(f => {
             const friendName = f.user_id_1 === user.id ? f.user2.username : f.user1.username;
-            return `<div class="friend-item">${friendName}</div>`;
+            return `<div class="friend-item">${sanitize(friendName)}</div>`;
         }).join('') : '<p>No friends yet.</p>';
 
         requestsDiv.innerHTML = pending.length ? pending.map(f => {
             const requesterName = f.requester_id === f.user_id_1 ? f.user1.username : f.user2.username;
             return `
                 <div class="request-item">
-                    <span>${requesterName} sent you a request</span>
+                    <span>${sanitize(requesterName)} sent you a request</span>
                     <div style="display: flex; gap: 8px;">
-                        <button class="btn btn--small btn--dark" onclick="acceptFriend('${f.friend_id}')">Accept</button>
-                        <button class="btn btn--small btn--dark" style="background: var(--accent-red);" onclick="declineFriend('${f.friend_id}')">Decline</button>
+                        <button class="btn btn--small btn--dark" onclick="acceptFriend('${sanitize(f.friend_id)}')">Accept</button>
+                        <button class="btn btn--small btn--dark" style="background: var(--accent-red);" onclick="declineFriend('${sanitize(f.friend_id)}')">Decline</button>
                     </div>
                 </div>
             `;
@@ -553,7 +536,6 @@ function initSettings() {
                         const { shell } = require('electron');
                         shell.openExternal(data.url);
                     } catch (e) {
-                        // Fallback for non-electron environment
                         window.open(data.url, '_blank');
                     }
                 } else {
@@ -566,15 +548,8 @@ function initSettings() {
     }
 }
 
-/* ── Analytics Logic ──────────────────────────────────────────────────────── */
+/* ── Analytics Logic (Real Spotify API) ───────────────────────────────────── */
 async function initAnalytics() {
-    const isConfigured = await checkSpotifyStatus();
-    if (!isConfigured) {
-        const statsGrid = document.querySelector('.stats-grid');
-        if (statsGrid) statsGrid.innerHTML = '<p class="text-muted" style="grid-column: 1/-1; text-align: center; padding: 40px;">Connect Spotify in Settings to view your listening analytics.</p>';
-        return;
-    }
-
     const btns = document.querySelectorAll('.timeframe-btn');
     btns.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -588,127 +563,95 @@ async function initAnalytics() {
 }
 
 async function loadAnalytics(timeframe) {
-    const historyList = document.getElementById('history-stats');
     const artistsList = document.getElementById('top-artists-list');
     const tracksList = document.getElementById('top-tracks-list');
     const recentList = document.getElementById('recent-tracks-list');
-    const playtimeEl = document.getElementById('total-playtime');
-    const songsLoggedEl = document.getElementById('songs-logged');
+    const genreEl = document.getElementById('top-genre');
+    const syncStatus = document.getElementById('spotify-sync-status');
 
-    // if (!historyList) return; // REMOVED: This was causing an early return since the ID doesn't exist in analytics.html
+    if (syncStatus) syncStatus.textContent = 'Syncing...';
 
-    // --- CONVINCING DEMO MOCK DATA ---
-    const mockData = {
-        short_term: {
-            songs: 142,
-            playtime: "8h 24m",
-            genre: "Indie Pop",
-            artists: [
-                { name: "Taylor Swift", popularity: 98, image: "https://i.scdn.co/image/ab6761610000e5eb5a00969d90918a163f45c2ae" },
-                { name: "The Weeknd", popularity: 95, image: "https://i.scdn.co/image/ab6761610000e5eb214f470001880486c9d09c31" },
-                { name: "Lana Del Rey", popularity: 89, image: "https://i.scdn.co/image/ab6761610000e5eb2d08560942e1a3bc33066601" },
-                { name: "Arctic Monkeys", popularity: 87, image: "https://i.scdn.co/image/ab6761610000e5eb7da39dea0a72f581535fb11f" },
-                { name: "Billie Eilish", popularity: 92, image: "https://i.scdn.co/image/ab6761610000e5eb221183df06e987c933979858" }
-            ],
-            tracks: [
-                { name: "Cruel Summer", artist: "Taylor Swift", album: "Lover", image: "https://i.scdn.co/image/ab67616d0000b273e787cffec20aa2a1562b7cf2" },
-                { name: "Blinding Lights", artist: "The Weeknd", album: "After Hours", image: "https://i.scdn.co/image/ab67616d0000b273886566993ef909249719396f" },
-                { name: "Starboy", artist: "The Weeknd", album: "Starboy", image: "https://i.scdn.co/image/ab67616d0000b2734718388b53b7c809741b4e9e" },
-                { name: "Say Yes To Heaven", artist: "Lana Del Rey", album: "Say Yes To Heaven", image: "https://i.scdn.co/image/ab67616d0000b27391730a394336c253896504a5" }
-            ],
-            recent: [
-                { name: "Fortnight", artist: "Taylor Swift", played_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(), image: "https://i.scdn.co/image/ab67616d0000b27382b988f06056f345c2f82c23" },
-                { name: "Espresso", artist: "Sabrina Carpenter", played_at: new Date(Date.now() - 1000 * 60 * 15).toISOString(), image: "https://i.scdn.co/image/ab67616d0000b273a0a38fd6a28e815e982d6ca0" },
-                { name: "Pink + White", artist: "Frank Ocean", played_at: new Date(Date.now() - 1000 * 60 * 45).toISOString(), image: "https://i.scdn.co/image/ab67616d0000b2730129033324f6502283cc2834" }
-            ]
-        },
-        medium_term: {
-            songs: 1240,
-            playtime: "72h 15m",
-            genre: "Synthwave",
-            artists: [
-                { name: "Daft Punk", popularity: 88, image: "https://i.scdn.co/image/ab6761610000e5eb24f470001880486c9d09c31" },
-                { name: "Kavinsky", popularity: 75, image: "https://i.scdn.co/image/ab6761610000e5ebf8713d78c0e2a3a7895f50ef" },
-                { name: "The Weeknd", popularity: 95, image: "https://i.scdn.co/image/ab6761610000e5eb214f470001880486c9d09c31" }
-            ],
-            tracks: [
-                { name: "Nightcall", artist: "Kavinsky", album: "OutRun", image: "https://i.scdn.co/image/ab67616d0000b2734107f9095655519491a6d912" },
-                { name: "One More Time", artist: "Daft Punk", album: "Discovery", image: "https://i.scdn.co/image/ab67616d0000b273ff20138546b4146a78287d3a" }
-            ],
-            recent: []
-        },
-        long_term: {
-            songs: 5280,
-            playtime: "312h 45m",
-            genre: "Classic Rock",
-            artists: [
-                { name: "Queen", popularity: 92, image: "https://i.scdn.co/image/ab6761610000e5eb6040854c30c822e18fa4cf2b" },
-                { name: "Pink Floyd", popularity: 85, image: "https://i.scdn.co/image/ab6761610000e5eb74b78631ef812a6409b626d7" },
-                { name: "The Beatles", popularity: 90, image: "https://i.scdn.co/image/ab6761610000e5ebc58f96e4693a388a100652da" }
-            ],
-            tracks: [
-                { name: "Bohemian Rhapsody", artist: "Queen", album: "A Night at the Opera", image: "https://i.scdn.co/image/ab67616d0000b273e319ba339066601f01c25143" },
-                { name: "Wish You Were Here", artist: "Pink Floyd", album: "Wish You Were Here", image: "https://i.scdn.co/image/ab67616d0000b2735702652b36203cf6551b9200" }
-            ],
-            recent: []
-        }
-    };
-
-    const currentMock = mockData[timeframe] || mockData.short_term;
-
-    function renderMock() {
-        if (playtimeEl) playtimeEl.textContent = currentMock.playtime;
-        if (songsLoggedEl) songsLoggedEl.textContent = currentMock.songs;
-        const genreEl = document.getElementById('top-genre');
-        if (genreEl) genreEl.textContent = currentMock.genre;
-
-        if (artistsList) {
-            artistsList.innerHTML = currentMock.artists.map(a => `
-                <div class="ranking-item">
-                    <div class="ranking-img" style="background: rgba(255,255,255,0.05);"></div>
-                    <div class="ranking-info">
-                        <div class="ranking-name">${a.name}</div>
-                        <div class="progress-bar"><div class="progress-fill" style="width: ${a.popularity}%"></div></div>
-                    </div>
-                    <div class="ranking-value">${a.popularity}%</div>
-                </div>
-            `).join('');
-        }
-
-        if (tracksList) {
-            tracksList.innerHTML = currentMock.tracks.map(t => `
-                <div class="ranking-item">
-                    <div class="ranking-img" style="background: rgba(255,255,255,0.05);"></div>
-                    <div class="ranking-info">
-                        <div class="ranking-name">${t.name}</div>
-                        <div class="ranking-sub">${t.artist} • ${t.album}</div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        if (recentList && currentMock.recent.length > 0) {
-            recentList.innerHTML = currentMock.recent.map(t => `
-                <div class="ranking-item">
-                    <div class="ranking-img" style="background: rgba(255,255,255,0.05);"></div>
-                    <div class="ranking-info">
-                        <div class="ranking-name">${t.name}</div>
-                        <div class="ranking-sub">${t.artist} • ${new Date(t.played_at).toLocaleString()}</div>
-                    </div>
-                </div>
-            `).join('');
-        }
-    }
-
-    renderMock(); // SHOW MOCK BY DEFAULT
-
-    /* 
-    // --- REAL API ATTEMPT (DISABLED FOR PURE DEMO AS REQUESTED) ---
     try {
-        const historyRes = await apiFetch(`/api/analytics?timeframe=${timeframe}`);
-        ...
+        const response = await apiFetch(`/api/analytics?timeframe=${timeframe}`);
+        if (!response.ok) {
+            const errData = await response.json();
+            if (syncStatus) syncStatus.textContent = errData.error || 'Error';
+            return;
+        }
+
+        const data = await response.json();
+
+        if (genreEl) genreEl.textContent = data.genre || 'Unknown';
+
+        if (artistsList && data.artists) {
+            artistsList.innerHTML = data.artists.length > 0 ? data.artists.map((a, i) => {
+                const imgHtml = a.image
+                    ? `<img class="ranking-img ranking-img--round" src="${sanitize(a.image)}" alt="${sanitize(a.name)}">`
+                    : `<div class="ranking-img ranking-img--round" style="background: rgba(255,255,255,0.05);"></div>`;
+                const genreHtml = (a.genres || []).map(g => `<span class="genre-badge">${sanitize(g)}</span>`).join('');
+                return `
+                <div class="ranking-item">
+                    <div class="ranking-rank">${i + 1}</div>
+                    ${imgHtml}
+                    <div class="ranking-info">
+                        <div class="ranking-name">${sanitize(a.name)}</div>
+                        <div>${genreHtml}</div>
+                    </div>
+                </div>
+            `}).join('') : '<p class="text-muted">No top artists data available.</p>';
+        }
+
+        if (tracksList && data.tracks) {
+            tracksList.innerHTML = data.tracks.length > 0 ? data.tracks.map((t, i) => {
+                const imgHtml = t.image
+                    ? `<img class="ranking-img" src="${sanitize(t.image)}" alt="${sanitize(t.name)}">`
+                    : `<div class="ranking-img" style="background: rgba(255,255,255,0.05);"></div>`;
+                const dur = t.duration_ms ? formatMs(t.duration_ms) : '';
+                return `
+                <div class="ranking-item">
+                    <div class="ranking-rank">${i + 1}</div>
+                    ${imgHtml}
+                    <div class="ranking-info">
+                        <div class="ranking-name">${sanitize(t.name)}</div>
+                        <div class="ranking-sub">${sanitize(t.artist)} · ${sanitize(t.album)}</div>
+                    </div>
+                    ${dur ? `<div class="ranking-sub" style="flex-shrink:0">${dur}</div>` : ''}
+                </div>
+            `}).join('') : '<p class="text-muted">No top tracks data available.</p>';
+        }
+
+        if (recentList && data.recent) {
+            recentList.innerHTML = data.recent.length > 0 ? data.recent.map(t => {
+                const imgHtml = t.image
+                    ? `<img class="ranking-img" src="${sanitize(t.image)}" alt="${sanitize(t.name)}">`
+                    : `<div class="ranking-img" style="background: rgba(255,255,255,0.05);"></div>`;
+                const timeAgo = getTimeAgo(t.played_at);
+                return `
+                <div class="ranking-item">
+                    ${imgHtml}
+                    <div class="ranking-info">
+                        <div class="ranking-name">${sanitize(t.name)}</div>
+                        <div class="ranking-sub">${sanitize(t.artist)}</div>
+                    </div>
+                    <div class="ranking-sub" style="flex-shrink:0">${timeAgo}</div>
+                </div>
+            `}).join('') : '<p class="text-muted">No recent listening data available.</p>';
+        }
+
+        if (syncStatus) syncStatus.textContent = 'Synced ✓';
     } catch (err) {
         console.error("Analytics Load Error:", err);
+        if (syncStatus) syncStatus.textContent = 'Error';
     }
-    */
+}
+
+function getTimeAgo(isoDate) {
+    const diff = Date.now() - new Date(isoDate).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    return `${days}d ago`;
 }

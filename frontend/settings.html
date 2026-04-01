@@ -11,111 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <style>
-        .layout {
-            display: flex;
-            min-height: 100vh;
-            background-color: var(--bg-primary);
-        }
-
-        .sidebar {
-            width: 250px;
-            background-color: var(--bg-secondary);
-            border-right: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            padding: 24px 0;
-        }
-
-        .sidebar__logo {
-            padding: 0 24px 32px 24px;
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .sidebar__nav {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .sidebar__link {
-            padding: 12px 24px;
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-weight: 500;
-            transition: color 0.2s, background-color 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .sidebar__link:hover,
-        .sidebar__link.active {
-            color: var(--text-primary);
-            background-color: rgba(255, 255, 255, 0.05);
-        }
-
-        .sidebar__link.active {
-            border-right: 3px solid var(--accent-purple);
-        }
-
-        .sidebar__footer {
-            padding: 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .user-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: var(--gradient-primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            color: white;
-        }
-
-        .main-view {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
-        }
-
-        .topbar {
-            height: 72px;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 48px;
-            background-color: rgba(13, 13, 18, 0.8);
-            backdrop-filter: blur(12px);
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-
-        .page-content {
-            padding: 48px;
-            max-width: 800px;
-            margin: 0 auto;
-            width: 100%;
-        }
+        .page-content { max-width: 800px; }
 
         .settings-section {
             background-color: var(--bg-secondary);
@@ -168,7 +64,6 @@
             font-size: 0.85rem;
         }
 
-        /* Toggle Switch Wrapper */
         .switch {
             position: relative;
             display: inline-block;
@@ -176,21 +71,16 @@
             height: 24px;
         }
 
-        /* Hide default HTML checkbox */
         .switch input {
             opacity: 0;
             width: 0;
             height: 0;
         }
 
-        /* The slider */
         .slider {
             position: absolute;
             cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            top: 0; left: 0; right: 0; bottom: 0;
             background-color: #334155;
             transition: .4s;
         }
@@ -206,27 +96,15 @@
             transition: .4s;
         }
 
-        input:checked+.slider {
-            background-color: var(--accent-purple);
-        }
-
-        input:checked+.slider:before {
-            transform: translateX(26px);
-        }
-
-        .slider.round {
-            border-radius: 34px;
-        }
-
-        .slider.round:before {
-            border-radius: 50%;
-        }
+        input:checked+.slider { background-color: var(--accent-purple); }
+        input:checked+.slider:before { transform: translateX(26px); }
+        .slider.round { border-radius: 34px; }
+        .slider.round:before { border-radius: 50%; }
     </style>
 </head>
 
 <body>
     <div class="layout">
-        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar__logo">
                 <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
@@ -235,7 +113,6 @@
                 </svg>
                 Audio-Draft2
             </div>
-
             <nav class="sidebar__nav">
                 <a href="dashboard.html" class="sidebar__link">Dashboard</a>
                 <a href="social.html" class="sidebar__link">Social</a>
@@ -243,7 +120,6 @@
                 <a href="analytics.html" class="sidebar__link">Analytics</a>
                 <a href="settings.html" class="sidebar__link active">Settings</a>
             </nav>
-
             <div class="sidebar__footer">
                 <div class="user-info">
                     <div class="user-avatar" id="nav-avatar">?</div>
@@ -255,7 +131,6 @@
             </div>
         </aside>
 
-        <!-- Main Content -->
         <main class="main-view">
             <header class="topbar">
                 <div class="topbar__title">Settings</div>
@@ -266,41 +141,23 @@
             </header>
 
             <div class="page-content">
-
-                <!-- Spotify API Settings -->
                 <section class="settings-section">
                     <h2>Spotify Integration</h2>
-                    <p>Connect your Spotify developer app credentials to enable recommendations and deep analytics.</p>
-
-                    <form id="spotify-settings-form" class="settings-form">
-                        <div class="form-group">
-                            <label for="client_id" class="form-label form-label--dark">Spotify Client ID</label>
-                            <input type="text" id="client_id" class="form-input form-input--light"
-                                placeholder="e.g. 32-character hex">
-                        </div>
-                        <div class="form-group">
-                            <label for="client_secret" class="form-label form-label--dark">Spotify Client Secret</label>
-                            <input type="password" id="client_secret" class="form-input form-input--light"
-                                placeholder="e.g. 32-character hex">
-                        </div>
-                        <button type="submit" class="btn btn--primary" id="spotify-save-btn">Save Credentials</button>
-                        <button type="button" class="btn btn--dark" id="connect-spotify-btn"
-                            style="margin-top: 12px; width: 100%; border: 1px solid var(--accent-purple);">Connect
-                            Spotify Account</button>
-                    </form>
+                    <p>Connect your Spotify account to enable trending songs, analytics, and now-playing features.</p>
+                    <div id="spotify-connection-status" style="padding: 16px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 16px;">
+                        Checking Spotify status...
+                    </div>
+                    <button type="button" class="btn btn--primary" id="connect-spotify-btn"
+                        style="width: 100%; border: 1px solid var(--accent-purple);">Connect Spotify Account</button>
                 </section>
 
-                <!-- Appearance Settings -->
                 <section class="settings-section">
                     <h2>Appearance</h2>
                     <p>Customize how Audio-Draft2 looks for you.</p>
-
-                    <div
-                        style="display: flex; align-items: center; justify-content: space-between; padding: 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 8px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 8px;">
                         <div>
                             <div style="font-weight: 600;">Light Mode</div>
-                            <div style="font-size: 0.8125rem; color: var(--text-secondary);">Switch to a bright
-                                interface</div>
+                            <div style="font-size: 0.8125rem; color: var(--text-secondary);">Switch to a bright interface</div>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="theme-toggle">
@@ -309,17 +166,13 @@
                     </div>
                 </section>
 
-                <!-- Blocking (Use Case 15) -->
                 <section class="settings-section">
                     <h2>Content Blocking</h2>
                     <p>Block specific artists or genres so they don't show up in your recommendations.</p>
-
-                    <form id="block-form" class="settings-form"
-                        style="display: flex; gap: 12px; align-items: flex-end;">
+                    <form id="block-form" class="settings-form" style="display: flex; gap: 12px; align-items: flex-end;">
                         <div class="form-group" style="flex: 1; margin-bottom: 0;">
                             <label for="block-type" class="form-label form-label--dark">Type</label>
-                            <select id="block-type" class="form-input form-input--light"
-                                style="appearance: auto; height: 50px;">
+                            <select id="block-type" class="form-input form-input--light" style="appearance: auto; height: 50px;">
                                 <option value="artist">Artist</option>
                                 <option value="genre">Genre</option>
                             </select>
@@ -329,59 +182,51 @@
                             <input type="text" id="block-name" class="form-input form-input--light"
                                 placeholder="e.g. Country or Taylor Swift" required>
                         </div>
-                        <button type="submit" class="btn btn--dark" id="block-submit-btn"
-                            style="height: 50px;">Block</button>
+                        <button type="submit" class="btn btn--dark" id="block-submit-btn" style="height: 50px;">Block</button>
                     </form>
-
-                    <ul class="block-list" id="block-list-container">
-                        <!-- Blocked items injected here -->
-                    </ul>
+                    <ul class="block-list" id="block-list-container"></ul>
                 </section>
-
             </div>
         </main>
     </div>
 
-    <!-- Required Scripts -->
     <script src="js/main.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
-            // Setup Settings forms
-            const spotifyForm = document.getElementById("spotify-settings-form");
-            const blockForm = document.getElementById("block-form");
+            // Check Spotify connection status on load
+            checkSpotifyConnection();
 
-            if (spotifyForm) {
-                spotifyForm.addEventListener("submit", async (e) => {
-                    e.preventDefault();
-                    const btn = document.getElementById("spotify-save-btn");
-                    const client_id = document.getElementById("client_id").value;
-                    const client_secret = document.getElementById("client_secret").value;
-
-                    // Simple client-side check to mimic main.js format but not restrict it entirely if users paste correctly
-                    btn.disabled = true;
-                    btn.textContent = "Saving...";
-
-                    try {
-                        const res = await apiFetch("/api/settings/spotify", {
-                            method: "POST",
-                            body: JSON.stringify({ client_id, client_secret })
-                        });
-
-                        const data = await res.json();
-                        if (res.ok) {
-                            alert("Spotify credentials saved successfully!");
-                        } else {
-                            alert(data.error || "Failed to save credentials");
-                        }
-                    } catch (err) {
-                        alert("Network error.");
-                    } finally {
-                        btn.disabled = false;
-                        btn.textContent = "Save Credentials";
+            async function checkSpotifyConnection() {
+                const statusEl = document.getElementById("spotify-connection-status");
+                const connectBtn = document.getElementById("connect-spotify-btn");
+                try {
+                    const res = await apiFetch("/api/spotify/status");
+                    const data = await res.json();
+                    if (data.connected) {
+                        statusEl.innerHTML = '<span style="color: #4ade80;">✓ Connected</span> — Spotify data is flowing into your dashboard and analytics.';
+                        connectBtn.textContent = "Reconnect Spotify Account";
+                    } else if (data.configured) {
+                        statusEl.innerHTML = '<span style="color: #fbbf24;">⚠ Not Connected</span> — Server has credentials, but you need to authorize your Spotify account.';
+                    } else {
+                        statusEl.innerHTML = '<span style="color: #f87171;">✗ Not configured</span> — Spotify credentials missing from server .env file.';
+                        connectBtn.disabled = true;
+                        connectBtn.textContent = "Server Not Configured";
                     }
-                });
+
+                    // Check URL params for success/error from OAuth callback
+                    const params = new URLSearchParams(window.location.search);
+                    if (params.get('success') === 'spotify_connected') {
+                        statusEl.innerHTML = '<span style="color: #4ade80;">✓ Successfully Connected!</span> — Your Spotify data is now live. Head to the Dashboard to see it.';
+                        connectBtn.textContent = "Reconnect Spotify Account";
+                    } else if (params.get('error')) {
+                        statusEl.innerHTML = '<span style="color: #f87171;">✗ Connection Failed</span> — ' + params.get('error') + '. Try again.';
+                    }
+                } catch (err) {
+                    statusEl.textContent = "Failed to check Spotify status.";
+                }
             }
 
+            const blockForm = document.getElementById("block-form");
             if (blockForm) {
                 loadBlockList();
 
@@ -416,10 +261,8 @@
                 });
             }
 
-            // Theme Toggle Logic
             const themeToggle = document.getElementById("theme-toggle");
             if (themeToggle) {
-                // Initial state set by initTheme in main.js will update the checkbox
                 themeToggle.addEventListener("change", (e) => {
                     const newTheme = e.target.checked ? 'light' : 'dark';
                     setTheme(newTheme);
@@ -455,7 +298,6 @@
                         container.appendChild(li);
                     });
 
-                    // Attach unblock handlers
                     document.querySelectorAll(".unblock-btn").forEach(btn => {
                         btn.addEventListener("click", async (e) => {
                             const blockId = e.target.getAttribute("data-id");
