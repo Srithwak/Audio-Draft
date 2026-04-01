@@ -1,0 +1,334 @@
+5.1	Use Cases
+User profile/authentication
+Create a playlist from the description
+Generate a playlist from listening history
+Export playlists
+Collaborate on playlist
+Receive notifications
+Compare playlists
+Add, remove, and manage friends
+View trending songs
+View users' music preference analytics
+Tag songs with mood descriptors
+Rename playlist 
+Toggle System theme
+Rate and review songs
+Generate Profile analytics
+
+5.2	Use Case Descriptions
+Use Case no.:  1
+Use Case Name:  User profile/authentication
+Actors: User, User Management System
+Description: 
+The user navigates to the registration or login page.
+The user enters required credentials (email and password).
+The system validates the credentials against stored user data.
+If valid, the system creates an authenticated session.
+The user is redirected to the dashboard.
+
+
+Alternate Path: The user may update profile information (username, theme preference) from the profile settings page.
+
+Exception Path: If credentials are invalid or the email already exists during registration, an error message is displayed.
+
+Pre-condition:
+ User must provide valid registration information
+The system must have access to the Users database
+
+Post-condition: User is successfully logged in and redirected to the dashboard, or an error message is displayed.
+
+
+Use Case no.:  2
+Use Case Name:  Create playlist from description
+Actors: User, Core System, Audio Analytics System
+Description: 
+The user navigates to “Create Playlist from Description” on the dashboard.
+The user enters a natural language description of a mood or scenario.
+The system processes the description using the LLM module.
+The system queries relevant songs using audio features and mood tags.
+A generated playlist is displayed to the user.
+The user chooses to save or discard the playlist.
+
+Alternate Path: The user may modify the description and regenerate the playlist.
+
+Exception Path: If the description cannot be processed or no matching songs are found, an error message is displayed.
+
+Pre-condition:
+User must have a valid account
+User must be logged in
+
+Post-condition: A playlist is generated and either saved to the user’s library or discarded.
+
+
+Use Case no.:  3
+Use Case Name:  Generate playlist from user listening history
+Actors: User, User Management System, Audio Analytics System
+Description: 
+The user selects the “Generate playlist from history” button on the dashboard
+The system uses the id of the user to grab their listening history
+Listening history is used by the Audio Analytics System to generate a playlist with tracks related to the user’s history
+The playlist “Your History Playlist #” is added to the user’s library, and a success message is displayed
+The user is redirected to their library of playlists
+Alternate Path: The user may choose to discard the generated playlist instead of adding it to their library
+Exception Path: If the user does not have any listening history, a playlist will not be generated, and an error will be displayed
+
+Pre-condition: 
+User must have a valid account
+User must have a listening history
+User must be logged in
+Post-condition: Playlist is generated based on user listening history, and the user is sent to their library of playlists
+
+Use Case no.:  4
+Use Case Name:  Export playlist
+Actors: User, Spotify API, External Tools Integration
+Description: 
+The user navigates to the playlist library on the dashboard
+The user selects a playlist from their library
+The user clicks the “Export Playlist” button
+The playlist is created on the user’s Spotify account using the Spotify API, and a success message is displayed
+The user is returned to their playlist library
+Alternate Path: None
+Exception Path: If the user does not have a Spotify account connected, an error is displayed prompting them to connect one
+Pre-condition: 
+User must have a valid account
+User must be logged in
+System must be given access to the user’s Spotify account
+Post-condition: Playlist is successfully created on the Spotify account connected to the user’s profile, and the user is returned to their library of playlists
+
+
+
+
+Use Case no.:  5
+Use Case Name:  Collaborate on playlist
+Actors: User, Core System, Playlist Versioning Manager
+Description: 
+The user navigates to a playlist they own.
+
+
+The user enables collaborative mode.
+
+
+The user invites another registered user to collaborate.
+
+
+The invited user accepts the collaboration request.
+
+
+Both users may add or remove songs from the playlist.
+
+
+Changes are tracked and saved as playlist versions.
+
+Alternate Path: The playlist owner may assign different permission levels (view-only or edit).
+
+Exception Path: If the invited user does not have a valid account, an error is displayed.
+
+Pre-condition:
+User must be logged in
+Playlist must exist
+The invited user must have a valid account
+
+Post-condition: The playlist becomes collaborative, and authorized users may edit it.
+
+
+Use Case no.:  6
+Use Case Name:  Receive notifications
+Actors: User, Core System
+Description: 
+A system event occurs (playlist invite, export success, collaboration change).
+
+
+The system generates a notification for the affected user.
+
+
+The notification is stored in the Notifications table.
+
+
+The user is alerted via the dashboard interface.
+
+
+The user views and optionally marks the notification as read.
+
+Alternate Path: The user may disable certain notification types in settings.
+
+Exception Path: If notification storage fails, the system logs the error but continues core operations.
+
+
+
+Pre-condition:
+User must have a valid account
+A triggering system event must occur
+
+Post-condition: The user is informed of the event, and the notification status is updated.
+Use Case no.:  7
+Use Case Name:  Compare playlists
+Actors: User, Core System, Playlist Versioning Manager, Audio Analytics System
+Description: 
+The user navigates to either their own playlist or the playlist of another user
+The user clicks the “Compare” button on the playlist page
+The user is displayed a list of the playlists in their library and must choose which playlist to compare to
+The playlists are compared by the Audio Analytics System
+The user is provided a report detailing similarities and differences between the two selected playlists
+Alternate Path: None
+Exception Path: If the user does not have any of their own playlists to compare to, an error is displayed prompting them to create a playlist to use the comparison function
+Pre-condition: 
+User must have a valid account
+User must be logged in
+User must have a valid playlist to compare to
+Post-condition: A report comparing the two playlists selected by the user is displayed, and when closed, the user is returned to the playlist page from step 1
+
+Use Case no.:  8
+Use Case Name:  Manage friends
+Actors: User, Core System, User Management System
+Description: 
+The user navigates to the “Friends” section on the dashboard.
+The user searches for another user by username or email.
+The user clicks “Add Friend” to send a friend request.
+The system records the request in the Friendships table with status PENDING.
+The receiving user is notified of the incoming friend request.
+The receiving user can choose to accept or decline the request.
+If accepted, the friendship status is updated to ACCEPTED, and both users appear in each other’s friends list.
+The user can also choose to Remove Friend, which deletes the friendship record from the database.
+Alternate Path: The receiving user declines the friend request. The system removes the pending request, and no friendship is created. 
+Exception Path: If the user searches for a username that does not exist, the system displays an error message indicating that the user could not be found.
+Pre-condition: 
+User must have a valid account
+User must be logged in
+Post-condition: A friendship relationship is created, updated, or removed depending on the user’s action, and the friends list is updated accordingly. 
+
+Use Case no.:  9
+Use Case Name:  View trending songs
+Actors: User, Core System
+Description: 
+User navigates to the “Trending Songs” section on the dashboard
+The page is populated with a ranked list of the top 50 currently trending songs
+Alternate Path: None
+Exception Path: If the trending score of any two or more songs is the same, those songs will be ordered alphabetically
+Pre-condition: 
+User must have a valid account
+User must be logged in
+Post-condition: The user is provided with a ranked list of the top 50 currently trending songs
+
+Use Case no.:  10
+Use Case Name:  View user music preference analytics
+Actors: User, Audio Analytics System
+Description: 
+The user navigates to the “Music Preference Analytics” section.
+The system retrieves aggregated listening history data.
+The system displays summaries such as top genres, total playtime, and trends over selected timeframes.
+The user may filter analytics by timeframe (week, month, year).
+The analytics dashboard updates dynamically based on selection.
+Alternate Path: If no timeframe is selected, the system defaults to the most recent week.
+
+Exception Path: If no listening history exists, the system displays a message indicating insufficient data.
+
+Pre-condition:
+ User must have a valid account
+User must be logged in
+
+Post-condition: The user is presented with a detailed analytics dashboard reflecting their music preferences.
+
+Use Case no.:  11
+Use Case Name:  Tag Songs with Mood Descriptors
+Actors: User, Core System, Audio Analytics System
+Description: 
+The user navigates to a song page or playlist.
+The user selects the option to add mood descriptors to a song.
+The user chooses one or more mood tags (e.g., happy, calm, energetic).
+The system validates and records the selected mood descriptors.
+The tagged data is stored and used by the Audio Analytics System to improve recommendations and playlist generation.
+Alternate Path: The user may remove or modify existing mood descriptors for the song
+
+Exception Path: If the song does not exist in the system database, an error message is displayed.
+
+Pre-condition:
+ User must have a valid account
+User must be logged in
+Song must exist in the system
+
+Post-condition: Mood descriptors are successfully associated with the song and stored in the database
+
+
+
+
+
+
+Use Case no.:  12
+Use Case Name:  Rename playlist
+Actors: User, Core System
+Description: 
+The user navigates to their playlist library.
+The user selects a playlist they own.
+The user clicks the “Rename Playlist” option.
+The user enters a new name for the playlist.
+The system validates the new name and updates the playlist record.
+The updated name is displayed in the user’s library. 
+Alternate Path: The user cancels the rename operation before saving.
+
+Exception Path: If the new playlist name is invalid or empty, the system displays an error message.
+
+Pre-condition:
+ User must have a valid account
+User must be logged in
+Playlist must exist and belong to the user
+
+Post-condition: 
+The playlist name is successfully updated in the system.
+
+Use Case no.:  13
+Use Case Name: Toggle System theme
+Actors: User, Core System
+Description: 
+The user navigates to the profile settings page.
+The user selects the option to change the system theme.
+The user toggles between available themes (e.g., light mode or dark mode).
+The system saves the theme preference in the user profile.
+The interface immediately updates to reflect the selected theme. 
+Alternate Path: The user may revert to the previous theme before saving.
+Exception Path: If the theme preference cannot be saved due to a system error, the system displays an error message and retains the previous theme.
+
+Pre-condition:
+ User must have a valid account
+User must be logged in
+
+Post-condition: The user’s theme preference is updated and applied across the system.
+Use Case no.:  14
+Use Case Name: Rate and review songs
+Actors: User, Core System
+Description: 
+The user navigates to a song page.
+The user selects the option to rate the song.
+The user provides a rating (e.g., 1–5 stars) and optionally writes a review.
+The system validates and stores the rating and review.
+The rating contributes to the song’s overall average rating displayed to users. 
+Alternate Path: The user may edit or delete their previously submitted rating or review.
+
+Exception Path: If the rating value is outside the valid range, the system displays an error message.
+
+Pre-condition:
+ User must have a valid account
+User must be logged in
+Song must exist in the system
+
+Post-condition: The rating and review are successfully recorded and associated with the user.
+
+
+
+Use Case no.:  15
+Use Case Name: Generate profile analytics
+Actors: User, Core system, Audio Analytics System
+Description: 
+The user navigates to the profile analytics section.
+The system retrieves user activity data, including playlists, listening history, and interactions.
+The Audio Analytics System processes the data to generate insights.
+The system displays analytics such as most played songs, favorite artists, listening patterns, and playlist activity.
+The user may explore different visualizations or filters. 
+Alternate Path: The user may export analytics summaries as a report.
+
+Exception Path: If insufficient data exists to generate analytics, the system displays a message indicating that more activity is required.
+
+Pre-condition:
+User must have a valid account
+User must be logged in
+
+Post-condition: The user is presented with a detailed analytics view of their profile activity and music behavior.
