@@ -592,28 +592,56 @@
         async function loadInternalPlaylists() {
             const container = document.getElementById("internal-playlists-container");
             try {
-                const res = await apiFetch("/api/playlists/internal");
-                const data = await res.json();
-                const playlists = data.playlists || [];
+                const [ownRes, collabRes] = await Promise.all([
+                    apiFetch("/api/playlists/internal"),
+                    apiFetch("/api/playlists/collaborative")
+                ]);
+                const ownData = await ownRes.json();
+                const collabData = await collabRes.json();
+                const ownPlaylists = ownData.playlists || [];
+                const collabPlaylists = collabData.playlists || [];
 
-                if (playlists.length === 0) {
+                if (ownPlaylists.length === 0 && collabPlaylists.length === 0) {
                     container.innerHTML = '<div class="empty-state"><h3>No Generated Playlists</h3><p>Use the Dashboard to create playlists from descriptions or your listening history.</p></div>';
                     return;
                 }
 
-                container.innerHTML = playlists.map(pl => `
+                let html = '';
+
+                // Own playlists
+                html += ownPlaylists.map(pl => `
                     <div class="internal-playlist-item">
                         <div class="internal-playlist-item__info">
                             <div class="internal-playlist-item__name">${sanitize(pl.name)}</div>
                             <div class="internal-playlist-item__desc">${sanitize(pl.description || 'No description')} · ${new Date(pl.created_at).toLocaleDateString()}</div>
                         </div>
                         <div class="internal-playlist-item__actions">
-                            <button class="btn btn--dark" style="font-size: 0.8rem; padding: 6px 12px;" onclick="openRenameModal('${pl.playlist_id}', '${sanitize(pl.name).replace(/'/g, "\\'")}')">✏️ Rename</button>
+                            <button class="btn btn--dark" style="font-size: 0.8rem; padding: 6px 12px;" onclick="openInternalPlaylistPanel('${pl.playlist_id}', '${sanitize(pl.name).replace(/'/g, "\\\\'")}')">👁 View Songs</button>
+                            <button class="btn btn--dark" style="font-size: 0.8rem; padding: 6px 12px;" onclick="openRenameModal('${pl.playlist_id}', '${sanitize(pl.name).replace(/'/g, "\\\\'")}')">✏️ Rename</button>
                             <button class="btn btn--dark" style="font-size: 0.8rem; padding: 6px 12px;" onclick="exportPlaylist('${pl.playlist_id}')">📤 Export</button>
                             <button class="btn btn--dark" style="font-size: 0.8rem; padding: 6px 12px;" onclick="openInviteModal('${pl.playlist_id}')">👥 Invite</button>
                         </div>
                     </div>
                 `).join('');
+
+                // Collaborative playlists (invited to)
+                if (collabPlaylists.length > 0) {
+                    html += '<h3 style="margin: 24px 0 12px; font-size: 1rem; color: var(--text-secondary);">👥 Collaborative Playlists</h3>';
+                    html += collabPlaylists.map(pl => `
+                        <div class="internal-playlist-item" style="border-left: 3px solid var(--accent-purple);">
+                            <div class="internal-playlist-item__info">
+                                <div class="internal-playlist-item__name">${sanitize(pl.name)} <span style="font-size: 0.7rem; background: rgba(167,139,250,0.15); color: var(--accent-purple); padding: 2px 8px; border-radius: 10px; margin-left: 8px;">${pl.permission_level || 'editor'}</span></div>
+                                <div class="internal-playlist-item__desc">${sanitize(pl.description || 'No description')} · ${new Date(pl.created_at).toLocaleDateString()}</div>
+                            </div>
+                            <div class="internal-playlist-item__actions">
+                                <button class="btn btn--dark" style="font-size: 0.8rem; padding: 6px 12px;" onclick="openInternalPlaylistPanel('${pl.playlist_id}', '${sanitize(pl.name).replace(/'/g, "\\\\'")}')">👁 View Songs</button>
+                                ${pl.permission_level !== 'viewer' ? `<button class="btn btn--dark" style="font-size: 0.8rem; padding: 6px 12px;" onclick="addDemoSong('${pl.playlist_id}')">+ Add Song</button>` : ''}
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                container.innerHTML = html;
             } catch (err) {
                 container.innerHTML = '<div class="empty-state"><h3>Error</h3><p>Failed to load internal playlists.</p></div>';
             }
@@ -633,6 +661,22 @@
             try {
                 const res = await apiFetch(`/api/spotify/playlists/${playlistId}/tracks`);
                 const data = await res.json();
+
+                if (!res.ok) {
+                    if (res.status === 401) {
+                        listEl.innerHTML = `<div style="text-align: center; padding: 32px; color: var(--accent-red);">
+                            <h4>Not Connected</h4>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 8px;">Your Spotify session expired.</p>
+                            <a href="settings.html" class="btn btn--dark" style="margin-top: 16px; display: inline-block;">Go to Settings</a>
+                        </div>`;
+                    } else {
+                        listEl.innerHTML = `<div style="text-align: center; padding: 32px; color: var(--accent-red);">
+                            <h4>Could not load tracks</h4>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 8px;">${sanitize(data.error || 'Unknown error')}</p>
+                        </div>`;
+                    }
+                    return;
+                }
 
                 if (!data.tracks || data.tracks.length === 0) {
                     listEl.innerHTML = '<div style="text-align: center; padding: 32px; color: var(--text-secondary);">This playlist is empty.</div>';
@@ -656,8 +700,87 @@
                     </div>`;
                 }).join('');
             } catch (err) {
+                console.error('openPlaylistPanel error:', err);
+                listEl.innerHTML = '<div style="text-align: center; padding: 32px; color: var(--text-secondary);">Failed to load tracks. Check console for details.</div>';
+            }
+        }
+
+        async function openInternalPlaylistPanel(playlistId, playlistName) {
+            const panel = document.getElementById("track-panel");
+            const overlay = document.getElementById("track-overlay");
+            const nameEl = document.getElementById("panel-playlist-name");
+            const listEl = document.getElementById("panel-track-list");
+
+            nameEl.textContent = playlistName;
+            listEl.innerHTML = '<div style="text-align: center; padding: 32px; color: var(--text-secondary);">Loading tracks...</div>';
+            panel.classList.add("open");
+            overlay.classList.add("open");
+
+            try {
+                const res = await apiFetch(`/api/playlists/internal/${playlistId}/tracks`);
+                const data = await res.json();
+
+                if (!data.tracks || data.tracks.length === 0) {
+                    listEl.innerHTML = '<div style="text-align: center; padding: 32px; color: var(--text-secondary);">This playlist is empty.</div>';
+                    // Allow adding a demo song even if empty
+                    listEl.innerHTML += `
+                        <div style="padding: 24px; text-align: center;">
+                            <button class="btn btn--dark" onclick="addDemoSong('${playlistId}')">+ Add Demo Song</button>
+                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px;">(Adds a placeholder track to demo collaboration)</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                listEl.innerHTML = data.tracks.map((t) => {
+                    const mins = Math.floor((t.duration_ms || 0) / 60000);
+                    const secs = Math.floor(((t.duration_ms || 0) % 60000) / 1000).toString().padStart(2, '0');
+                    return `
+                    <div class="track-item">
+                        <div class="track-item__img" style="display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--text-secondary);">🎵</div>
+                        <div class="track-item__info">
+                            <div class="track-item__name">${sanitize(t.title)}</div>
+                            <div class="track-item__artist">${sanitize(t.artist)}</div>
+                        </div>
+                        <div class="track-item__duration">${mins}:${secs}</div>
+                        <button class="btn btn--dark" style="background: var(--accent-red); margin-left: 8px; padding: 4px 8px; font-size: 0.75rem;" onclick="removeSongFromInternal('${playlistId}', '${t.song_id}')">Remove</button>
+                    </div>`;
+                }).join('');
+                
+                listEl.innerHTML += `
+                    <div style="padding: 24px; text-align: center;">
+                        <button class="btn btn--dark" onclick="addDemoSong('${playlistId}')">+ Add Demo Song</button>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px;">(Adds a placeholder track to demo collaboration)</p>
+                    </div>
+                `;
+
+            } catch (err) {
                 listEl.innerHTML = '<div style="text-align: center; padding: 32px; color: var(--text-secondary);">Failed to load tracks.</div>';
             }
+        }
+
+        async function removeSongFromInternal(playlistId, songId) {
+            if (!confirm('Remove this song from the playlist?')) return;
+            try {
+                const res = await apiFetch(`/api/playlists/${playlistId}/songs/${songId}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok) alert(data.error);
+                openInternalPlaylistPanel(playlistId, document.getElementById("panel-playlist-name").textContent);
+            } catch (err) { alert('Failed to remove'); }
+        }
+
+        async function addDemoSong(playlistId) {
+            const fakeSongs = [
+                { song_name: "Collaborative Track " + Math.floor(Math.random()*100), artist: "Audio-Draft", uri: "spotify:track:4cOdK2wGLETKBW3PvgPWqT" }
+            ];
+            try {
+                const res = await apiFetch(`/api/playlists/${playlistId}/songs`, {
+                    method: 'POST', body: JSON.stringify(fakeSongs[0])
+                });
+                const data = await res.json();
+                if (!res.ok) alert(data.error);
+                openInternalPlaylistPanel(playlistId, document.getElementById("panel-playlist-name").textContent);
+            } catch (err) { alert('Failed to add'); }
         }
 
         // --- Compare ---
@@ -682,26 +805,48 @@
 
         async function runCompare(id1, id2, name2) {
             const resultsDiv = document.getElementById('compare-results');
-            resultsDiv.innerHTML = '<p style="color: var(--text-secondary);">Comparing...</p>';
+            resultsDiv.innerHTML = '<p style="color: var(--text-secondary);">Loading tracks and comparing...</p>';
 
             try {
                 const [res1, res2] = await Promise.all([
                     apiFetch(`/api/spotify/playlists/${id1}/tracks`),
                     apiFetch(`/api/spotify/playlists/${id2}/tracks`)
                 ]);
+
+                if (!res1.ok || !res2.ok) {
+                    const err1 = !res1.ok ? await res1.json() : null;
+                    const err2 = !res2.ok ? await res2.json() : null;
+                    const errMsg = (err1?.error || '') + (err2?.error ? ' / ' + err2.error : '');
+                    resultsDiv.innerHTML = `<p style="color: var(--accent-red);">Failed to load playlist tracks: ${sanitize(errMsg || 'Unknown error')}</p>`;
+                    return;
+                }
+
                 const data1 = await res1.json();
                 const data2 = await res2.json();
+
+                const tracks1 = data1.tracks || [];
+                const tracks2 = data2.tracks || [];
+
+                if (tracks1.length === 0 && tracks2.length === 0) {
+                    resultsDiv.innerHTML = '<p style="color: var(--text-secondary);">Both playlists appear to be empty.</p>';
+                    return;
+                }
 
                 const compareRes = await apiFetch('/api/playlists/compare', {
                     method: 'POST',
                     body: JSON.stringify({
                         playlist_id_1: id1,
                         playlist_id_2: id2,
-                        tracks_1: data1.tracks || [],
-                        tracks_2: data2.tracks || []
+                        tracks_1: tracks1,
+                        tracks_2: tracks2
                     })
                 });
                 const result = await compareRes.json();
+
+                if (!compareRes.ok) {
+                    resultsDiv.innerHTML = `<p style="color: var(--accent-red);">Compare failed: ${sanitize(result.error || 'Unknown error')}</p>`;
+                    return;
+                }
 
                 resultsDiv.innerHTML = `
                     <div class="compare-stat">
@@ -722,13 +867,14 @@
                             <div style="font-size: 0.75rem; color: var(--text-secondary);">Playlist 2 Tracks</div>
                         </div>
                     </div>
-                    ${result.common_tracks.length > 0 ? `
+                    ${result.common_tracks && result.common_tracks.length > 0 ? `
                         <h4 style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px;">Common Tracks</h4>
                         ${result.common_tracks.slice(0, 10).map(t => `<div style="font-size: 0.85rem; padding: 4px 0; border-bottom: 1px solid var(--border-color);">${sanitize(t.name)} — ${sanitize(t.artist)}</div>`).join('')}
                     ` : '<p style="color: var(--text-secondary); font-size: 0.85rem;">No common tracks found.</p>'}
                 `;
             } catch (err) {
-                resultsDiv.innerHTML = '<p style="color: var(--accent-red);">Failed to compare playlists.</p>';
+                console.error('runCompare error:', err);
+                resultsDiv.innerHTML = '<p style="color: var(--accent-red);">Failed to compare playlists. Check console for details.</p>';
             }
         }
 
@@ -798,9 +944,10 @@
             btn.disabled = true; btn.textContent = 'Sending...';
 
             try {
+                const permission_level = document.getElementById('invite-permission').value;
                 const res = await apiFetch(`/api/playlists/${currentInvitePlaylistId}/invite`, {
                     method: 'POST',
-                    body: JSON.stringify({ identifier })
+                    body: JSON.stringify({ identifier, permission_level })
                 });
                 const data = await res.json();
                 alert(data.message || data.error);

@@ -1,0 +1,7 @@
+TOKEN: OK
+TEST1 NO-FIELDS: FAIL status=403
+  data={"error":{"status":403,"message":"Forbidden"}}
+TEST2 WITH-FIELDS: FAIL status=403
+  data={"error":{"status":403,"message":"Forbidden"}}
+TEST3 SERVER-ENDPOINT: FAIL status=undefined
+  data=undefined

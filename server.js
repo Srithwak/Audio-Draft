@@ -91,6 +91,35 @@ async function getValidSpotifyToken(userId) {
     return { error: null, token };
 }
 
+// --- Client Credentials token (app-level, no user scope needed) ---
+let clientCredToken = { token: null, expires_at: 0 };
+
+async function getClientCredentialsToken() {
+    if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
+        return { error: "Spotify not configured on server", token: null };
+    }
+    if (clientCredToken.token && Date.now() < clientCredToken.expires_at) {
+        return { error: null, token: clientCredToken.token };
+    }
+    try {
+        const res = await axios.post('https://accounts.spotify.com/api/token',
+            querystring.stringify({ grant_type: 'client_credentials' }), {
+            headers: {
+                'Authorization': 'Basic ' + Buffer.from(SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).toString('base64'),
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        });
+        clientCredToken = {
+            token: res.data.access_token,
+            expires_at: Date.now() + (res.data.expires_in - 60) * 1000
+        };
+        return { error: null, token: clientCredToken.token };
+    } catch (err) {
+        console.error("Client credentials token failed:", err.response?.data || err.message);
+        return { error: "Failed to get app token", token: null };
+    }
+}
+
 // --- Root route ---
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
@@ -366,7 +395,7 @@ app.post('/api/playlists', authenticateUser, async (req, res) => {
 
 app.post('/api/playlists/:id/invite', authenticateUser, async (req, res) => {
     const playlistId = req.params.id;
-    const { identifier } = req.body;
+    const { identifier, permission_level } = req.body;
 
     if (!identifier) {
         return res.status(400).json({ error: "User identifier required" });
@@ -389,12 +418,25 @@ app.post('/api/playlists/:id/invite', authenticateUser, async (req, res) => {
             return res.status(400).json({ error: "Cannot invite yourself" });
         }
 
+        // Get playlist name for notification
+        const { data: plData } = await supabase.from('playlists')
+            .select('name').eq('playlist_id', playlistId);
+        const playlistName = plData?.[0]?.name || 'a playlist';
+
+        // Get inviter username
+        const { data: inviterData } = await supabase.from('users')
+            .select('username').eq('user_id', req.user.user_id);
+        const inviterName = inviterData?.[0]?.username || 'Someone';
+
         // 2. Insert into Playlist_Collaborators
         const { error: collabError } = await supabase
             .from('playlist_collaborators')
             .insert([{
                 playlist_id: playlistId,
-                user_id: targetUserId
+                user_id: targetUserId,
+                invited_by: req.user.user_id,
+                permission_level: permission_level || 'editor',
+                joined_at: new Date().toISOString()
             }]);
 
         if (collabError && !collabError.message.includes('duplicate key value')) {
@@ -407,18 +449,65 @@ app.post('/api/playlists/:id/invite', authenticateUser, async (req, res) => {
             .update({ is_collaborative: true })
             .eq('playlist_id', playlistId);
 
-        // 4. Send Notification to target user
+        // 4. Send Notification with related_id so recipient can act on it
         await supabase
             .from('notifications')
             .insert([{
                 user_id: targetUserId,
-                type: 'SYSTEM',
-                message: 'You have been invited to collaborate on a playlist.',
+                type: 'PLAYLIST_INVITE',
+                message: `${inviterName} invited you to collaborate on "${playlistName}"`,
                 is_read: false,
+                related_id: playlistId,
+                related_type: 'playlist',
                 created_at: new Date().toISOString()
             }]);
 
         res.json({ message: "User invited successfully" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- Accept Collaboration Invite ---
+app.post('/api/playlists/:id/accept-invite', authenticateUser, async (req, res) => {
+    try {
+        const playlistId = req.params.id;
+        const userId = req.user.user_id;
+
+        // Check if user is already a collaborator
+        const { data: existing } = await supabase.from('playlist_collaborators')
+            .select('collab_id, permission_level')
+            .eq('playlist_id', playlistId)
+            .eq('user_id', userId);
+
+        if (!existing || existing.length === 0) {
+            return res.status(404).json({ error: "No invitation found for this playlist" });
+        }
+
+        res.json({ message: "You are now a collaborator!", permission_level: existing[0].permission_level });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- Get collaborative playlists the user is invited to ---
+app.get('/api/playlists/collaborative', authenticateUser, async (req, res) => {
+    try {
+        const { data: collabs, error: collabErr } = await supabase
+            .from('playlist_collaborators')
+            .select('playlist_id, permission_level, playlists(playlist_id, name, description, is_collaborative, created_at, creator_id)')
+            .eq('user_id', req.user.user_id);
+
+        if (collabErr) throw collabErr;
+
+        const playlists = (collabs || [])
+            .filter(c => c.playlists)
+            .map(c => ({
+                ...c.playlists,
+                permission_level: c.permission_level
+            }));
+
+        res.json({ playlists });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -434,8 +523,7 @@ app.get('/api/users/search', authenticateUser, async (req, res) => {
             .from('users')
             .select('user_id, username, email')
             .or(`username.ilike.%${q}%,email.ilike.%${q}%`)
-            .neq('user_id', req.user.user_id)
-            .limit(10);
+            .neq('user_id', req.user.user_id);
 
         if (error) throw error;
         res.json({ users: data || [] });
@@ -647,8 +735,7 @@ app.get('/api/spotify/playlists', authenticateUser, async (req, res) => {
         if (tokenError) return res.status(401).json({ error: tokenError });
 
         const spotifyRes = await axios.get('https://api.spotify.com/v1/me/playlists', {
-            headers: { 'Authorization': `Bearer ${token}` },
-            params: { limit: 20 }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
         const playlists = spotifyRes.data.items.map(pl => ({
@@ -672,22 +759,61 @@ app.get('/api/spotify/playlists', authenticateUser, async (req, res) => {
 // --- Playlist Tracks ---
 app.get('/api/spotify/playlists/:playlistId/tracks', authenticateUser, async (req, res) => {
     try {
-        const { error: tokenError, token } = await getValidSpotifyToken(req.user.user_id);
-        if (tokenError) return res.status(401).json({ error: tokenError });
+        let token;
+        // Try user token first
+        const userResult = await getValidSpotifyToken(req.user.user_id);
+        token = userResult.token;
 
-        const spotifyRes = await axios.get(`https://api.spotify.com/v1/playlists/${req.params.playlistId}/tracks`, {
-            headers: { 'Authorization': `Bearer ${token}` },
-            params: { limit: 50, fields: 'items(track(name,artists(name),album(name,images),duration_ms,external_urls,uri,id))' }
-        });
+        let spotifyRes;
+        const params = { limit: 100 };
+        
+        // Attempt with user token first, then fallback to client credentials
+        if (token) {
+            try {
+                spotifyRes = await axios.get(`https://api.spotify.com/v1/playlists/${req.params.playlistId}/tracks`, {
+                    headers: { 'Authorization': `Bearer ${token}` }, params
+                });
+            } catch (userErr) {
+                const errMsg = JSON.stringify(userErr.response?.data || userErr.message);
+                console.error(`User token failed for playlist tracks (${req.params.playlistId}):`, errMsg);
+                require('fs').appendFileSync('spotify_err.log', new Date().toISOString() + ' UserErr: ' + errMsg + '\n');
+                // Fall through to client credentials fallback
+                token = null;
+            }
+        }
 
-        const tracks = spotifyRes.data.items
-            .filter(item => item.track)
+        // Fallback: try client credentials for public playlists
+        if (!spotifyRes) {
+            const ccResult = await getClientCredentialsToken();
+            if (!ccResult.token) {
+                return res.status(401).json({ error: 'Spotify not connected. Go to Settings to connect your account.' });
+            }
+            try {
+                spotifyRes = await axios.get(`https://api.spotify.com/v1/playlists/${req.params.playlistId}/tracks`, {
+                    headers: { 'Authorization': `Bearer ${ccResult.token}` }, params
+                });
+            } catch (ccErr) {
+                console.error(`Client credentials also failed for playlist tracks:`, ccErr.response?.status || ccErr.message);
+                const statusCode = ccErr.response?.status || 500;
+                let errorMsg = ccErr.response?.data?.error?.message || 'Failed to load tracks. This playlist may be private.';
+                
+                if (statusCode === 403) {
+                    errorMsg = "Spotify Development Mode API restriction: Cannot view tracks for playlists you don't own. Ensure you connected to Spotify and use your own playlists.";
+                }
+                
+                return res.status(statusCode).json({ error: errorMsg });
+            }
+        }
+
+        const items = spotifyRes.data?.items || [];
+        const tracks = items
+            .filter(item => item && item.track && !item.track.is_local)
             .map(item => ({
                 name: item.track.name,
-                artist: item.track.artists.map(a => a.name).join(', '),
-                album: item.track.album.name,
-                image: item.track.album.images?.[2]?.url || item.track.album.images?.[0]?.url || null,
-                duration_ms: item.track.duration_ms,
+                artist: item.track.artists?.map(a => a.name).join(', ') || 'Unknown Artist',
+                album: item.track.album?.name || 'Unknown Album',
+                image: item.track.album?.images?.[2]?.url || item.track.album?.images?.[0]?.url || null,
+                duration_ms: item.track.duration_ms || 0,
                 external_url: item.track.external_urls?.spotify || null,
                 uri: item.track.uri || null,
                 id: item.track.id || null
@@ -695,8 +821,10 @@ app.get('/api/spotify/playlists/:playlistId/tracks', authenticateUser, async (re
 
         res.json({ tracks });
     } catch (err) {
-        console.error("Playlist Tracks Error:", err.response?.data || err.message);
-        res.status(500).json({ error: err.message });
+        console.error("Playlist Tracks Error:", err.response?.status, err.response?.data || err.message);
+        const statusCode = err.response?.status || 500;
+        const errorMsg = err.response?.data?.error?.message || err.message || 'Failed to load tracks';
+        res.status(statusCode).json({ error: errorMsg });
     }
 });
 
@@ -830,8 +958,7 @@ app.post('/api/playlists/generate-from-description', authenticateUser, async (re
             headers: { 'Authorization': `Bearer ${token}` },
             params: {
                 q: `genre:${seedGenres[0]} ${description.split(' ').slice(0, 3).join(' ')}`,
-                type: 'track',
-                limit: 20
+                type: 'track'
             }
         });
 
@@ -865,9 +992,32 @@ app.post('/api/playlists/generate-from-description', authenticateUser, async (re
 
         if (plError) throw plError;
 
+        const newPlaylistId = plData?.[0]?.playlist_id;
+
+        // Persist tracks to songs + playlist_songs so they appear in internal view
+        if (newPlaylistId && tracks.length > 0) {
+            const { data: version } = await supabase.from('playlist_versions')
+                .insert([{ playlist_id: newPlaylistId, created_by: req.user.user_id, snapshot_date: new Date().toISOString(), label: 'Initial generation', is_manual: false }])
+                .select('version_id');
+            if (version?.[0]) {
+                for (const t of tracks) {
+                    let songId;
+                    const { data: ex } = await supabase.from('songs').select('song_id').eq('title', t.name).eq('artist', t.artist).limit(1);
+                    if (ex?.length) { songId = ex[0].song_id; }
+                    else {
+                        const { data: ns } = await supabase.from('songs').insert([{ title: t.name, artist: t.artist, album: t.album, duration_ms: t.duration_ms, spotify_uri: t.uri || '' }]).select('song_id');
+                        songId = ns?.[0]?.song_id;
+                    }
+                    if (songId) {
+                        await supabase.from('playlist_songs').insert([{ version_id: version[0].version_id, song_id: songId, added_by: req.user.user_id, added_at: new Date().toISOString() }]);
+                    }
+                }
+            }
+        }
+
         res.json({
             message: "Playlist generated from description",
-            playlist_id: plData?.[0]?.playlist_id || null,
+            playlist_id: newPlaylistId || null,
             playlist_name: playlistName,
             tracks
         });
@@ -944,9 +1094,32 @@ app.post('/api/playlists/generate-from-history', authenticateUser, async (req, r
 
         if (plError) throw plError;
 
+        const newPlaylistId = plData?.[0]?.playlist_id;
+
+        // Persist tracks to songs + playlist_songs
+        if (newPlaylistId && tracks.length > 0) {
+            const { data: version } = await supabase.from('playlist_versions')
+                .insert([{ playlist_id: newPlaylistId, created_by: req.user.user_id, snapshot_date: new Date().toISOString(), label: 'Initial generation', is_manual: false }])
+                .select('version_id');
+            if (version?.[0]) {
+                for (const t of tracks) {
+                    let songId;
+                    const { data: ex } = await supabase.from('songs').select('song_id').eq('title', t.name).eq('artist', t.artist).limit(1);
+                    if (ex?.length) { songId = ex[0].song_id; }
+                    else {
+                        const { data: ns } = await supabase.from('songs').insert([{ title: t.name, artist: t.artist, album: t.album, duration_ms: t.duration_ms, spotify_uri: t.uri || '' }]).select('song_id');
+                        songId = ns?.[0]?.song_id;
+                    }
+                    if (songId) {
+                        await supabase.from('playlist_songs').insert([{ version_id: version[0].version_id, song_id: songId, added_by: req.user.user_id, added_at: new Date().toISOString() }]);
+                    }
+                }
+            }
+        }
+
         res.json({
             message: "Playlist generated from listening history",
-            playlist_id: plData?.[0]?.playlist_id || null,
+            playlist_id: newPlaylistId || null,
             playlist_name: playlistName,
             tracks
         });
@@ -996,12 +1169,27 @@ app.post('/api/playlists/:id/export', authenticateUser, async (req, res) => {
 
         const spotifyPlaylistId = createRes.data.id;
 
-        // If we have track URIs in the request body, add them
-        const { track_uris } = req.body;
-        if (track_uris && track_uris.length > 0) {
+        // If we have track URIs in the request body, use those. Otherwise, fetch from database.
+        let urisToAdd = req.body.track_uris;
+        if (!urisToAdd || urisToAdd.length === 0) {
+            // Get ALL versions for this playlist (songs can be spread across versions)
+            const { data: versions } = await supabase.from('playlist_versions')
+                .select('version_id').eq('playlist_id', playlistId);
+            if (versions && versions.length > 0) {
+                const versionIds = versions.map(v => v.version_id);
+                const { data: songs } = await supabase.from('playlist_songs')
+                    .select('songs(spotify_uri)').in('version_id', versionIds);
+                if (songs) {
+                    // Deduplicate URIs
+                    urisToAdd = [...new Set(songs.map(s => s.songs?.spotify_uri).filter(u => u))];
+                }
+            }
+        }
+
+        if (urisToAdd && urisToAdd.length > 0) {
             await axios.post(
                 `https://api.spotify.com/v1/playlists/${spotifyPlaylistId}/tracks`,
-                { uris: track_uris.slice(0, 100) },
+                { uris: urisToAdd.slice(0, 100) },
                 { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } }
             );
         }
@@ -1174,6 +1362,42 @@ app.put('/api/playlists/:id/permissions', authenticateUser, async (req, res) => 
     }
 });
 
+// --- View Internal Playlist Songs ---
+app.get('/api/playlists/internal/:id/tracks', authenticateUser, async (req, res) => {
+    try {
+        // Get ALL versions for this playlist (songs can be spread across versions)
+        const { data: versions } = await supabase.from('playlist_versions')
+            .select('version_id')
+            .eq('playlist_id', req.params.id);
+
+        if (!versions || versions.length === 0) {
+            return res.json({ tracks: [] });
+        }
+
+        const versionIds = versions.map(v => v.version_id);
+
+        const { data, error } = await supabase.from('playlist_songs')
+            .select('added_by, songs(song_id, title, artist, duration_ms, spotify_uri, album)')
+            .in('version_id', versionIds);
+
+        if (error) throw error;
+
+        // Deduplicate by song_id (a song may appear in multiple versions)
+        const seen = new Set();
+        const tracks = [];
+        (data || []).forEach(d => {
+            if (d.songs && !seen.has(d.songs.song_id)) {
+                seen.add(d.songs.song_id);
+                tracks.push({ ...d.songs, added_by: d.added_by });
+            }
+        });
+
+        res.json({ tracks });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- UC7: Compare Playlists ---
 app.post('/api/playlists/compare', authenticateUser, async (req, res) => {
     const { playlist_id_1, playlist_id_2, tracks_1, tracks_2 } = req.body;
@@ -1237,41 +1461,48 @@ app.post('/api/playlists/compare', authenticateUser, async (req, res) => {
 // --- UC9: Trending Songs ---
 app.get('/api/trending', authenticateUser, async (req, res) => {
     try {
-        const { error: tokenError, token } = await getValidSpotifyToken(req.user.user_id);
-        if (tokenError) return res.status(401).json({ error: tokenError });
+        // Use client credentials (app-level) token
+        const { error: tokenError, token } = await getClientCredentialsToken();
+        if (tokenError) return res.status(500).json({ error: tokenError });
 
-        // Get global top 50 from Spotify's "Top 50 - Global" playlist
-        // Spotify's curated global top 50 playlist ID
-        const globalTop50Id = '37i9dQZEVXbMDoHDwVN2tF';
+        // Use Spotify's Search API for popular/trending tracks (works with client credentials)
+        // Search for current popular tracks across genres
+        const genres = ['pop', 'hip-hop', 'rock', 'r&b', 'latin'];
+        const searchPromises = genres.map(genre =>
+            axios.get('https://api.spotify.com/v1/search', {
+                headers: { 'Authorization': `Bearer ${token}` },
+                params: { q: `genre:${genre}`, type: 'track', limit: 10, market: 'US' }
+            }).catch(() => ({ data: { tracks: { items: [] } } }))
+        );
 
-        const spotifyRes = await axios.get(`https://api.spotify.com/v1/playlists/${globalTop50Id}/tracks`, {
-            headers: { 'Authorization': `Bearer ${token}` },
-            params: { limit: 50, fields: 'items(track(name,artists(name),album(name,images),duration_ms,external_urls,popularity,uri,id))' }
+        const results = await Promise.all(searchPromises);
+        const trackMap = new Map();
+
+        results.forEach(r => {
+            (r.data.tracks?.items || []).forEach(t => {
+                if (t && t.id && !trackMap.has(t.id)) {
+                    trackMap.set(t.id, {
+                        name: t.name,
+                        artist: t.artists.map(a => a.name).join(', '),
+                        album: t.album.name,
+                        image: t.album.images?.[1]?.url || t.album.images?.[0]?.url || null,
+                        duration_ms: t.duration_ms,
+                        popularity: t.popularity || 0,
+                        external_url: t.external_urls?.spotify || null,
+                        uri: t.uri || null,
+                        id: t.id || null
+                    });
+                }
+            });
         });
 
-        let tracks = spotifyRes.data.items
-            .filter(item => item.track)
-            .map((item, index) => ({
-                rank: index + 1,
-                name: item.track.name,
-                artist: item.track.artists.map(a => a.name).join(', '),
-                album: item.track.album.name,
-                image: item.track.album.images?.[1]?.url || item.track.album.images?.[0]?.url || null,
-                duration_ms: item.track.duration_ms,
-                popularity: item.track.popularity || 0,
-                external_url: item.track.external_urls?.spotify || null,
-                uri: item.track.uri || null,
-                id: item.track.id || null
-            }));
+        let tracks = Array.from(trackMap.values());
 
-        // Sort by popularity (descending), then alphabetically for ties
-        tracks.sort((a, b) => {
-            if (b.popularity !== a.popularity) return b.popularity - a.popularity;
-            return a.name.localeCompare(b.name);
-        });
+        // Sort by popularity (descending)
+        tracks.sort((a, b) => b.popularity - a.popularity);
 
-        // Re-rank after sorting
-        tracks = tracks.map((t, i) => ({ ...t, rank: i + 1 }));
+        // Take top 50 and assign ranks
+        tracks = tracks.slice(0, 50).map((t, i) => ({ ...t, rank: i + 1 }));
 
         res.json({ tracks });
     } catch (err) {

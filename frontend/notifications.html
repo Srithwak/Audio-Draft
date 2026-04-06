@@ -148,13 +148,20 @@
 
                         const card = document.createElement("div");
                         card.className = `notification-card ${notif.is_read ? '' : 'unread'}`;
+
+                        let actionHtml = '';
+                        if (notif.type === 'PLAYLIST_INVITE' && notif.related_id) {
+                            actionHtml = `<button class="btn btn--primary accept-invite-btn" data-playlist-id="${notif.related_id}" data-notif-id="${notif.notification_id}" style="font-size: 0.8rem; padding: 6px 14px; border: 1px solid var(--accent-purple); margin-right: 8px;">✓ Accept & View</button>`;
+                        }
+
                         card.innerHTML = `
                             <div class="notification-card__content">
-                                <h3>${notif.type}</h3>
+                                <h3>${notif.type === 'PLAYLIST_INVITE' ? '👥 Playlist Invite' : notif.type}</h3>
                                 <p>${notif.message}</p>
                                 <span class="notification-card__time">${dateStr}</span>
                             </div>
-                            <div class="notification-card__actions">
+                            <div class="notification-card__actions" style="display: flex; align-items: center; gap: 8px;">
+                                ${actionHtml}
                                 ${!notif.is_read ? `<button class="btn btn--dark mark-read-btn" data-id="${notif.notification_id}">Mark Read</button>` : ''}
                             </div>
                         `;
@@ -177,6 +184,33 @@
                             e.target.textContent = "...";
                             await apiFetch(`/api/notifications/${notifId}/read`, { method: 'POST' });
                             loadNotifications();
+                        });
+                    });
+
+                    // Accept invite handlers
+                    document.querySelectorAll(".accept-invite-btn").forEach(btn => {
+                        btn.addEventListener("click", async (e) => {
+                            const playlistId = e.target.getAttribute("data-playlist-id");
+                            const notifId = e.target.getAttribute("data-notif-id");
+                            e.target.disabled = true;
+                            e.target.textContent = "Accepting...";
+                            try {
+                                const res = await apiFetch(`/api/playlists/${playlistId}/accept-invite`, { method: 'POST' });
+                                const data = await res.json();
+                                if (res.ok) {
+                                    await apiFetch(`/api/notifications/${notifId}/read`, { method: 'POST' });
+                                    alert(`${data.message} You have ${data.permission_level} access.`);
+                                    window.location.href = 'playlists.html';
+                                } else {
+                                    alert(data.error || 'Failed to accept invite');
+                                    e.target.disabled = false;
+                                    e.target.textContent = "✓ Accept & View";
+                                }
+                            } catch (err) {
+                                alert('Failed to accept invite');
+                                e.target.disabled = false;
+                                e.target.textContent = "✓ Accept & View";
+                            }
                         });
                     });
                 }
