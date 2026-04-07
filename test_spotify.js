@@ -1,98 +1,120 @@
-// Quick diagnostic script to test Spotify token flows
-require('dotenv').config({ path: './database/.env' });
-const axios = require('axios');
-const querystring = require('querystring');
+const CLIENT_ID = "de6472af99064239960e491418bb85b5";
+const CLIENT_SECRET = "4c20ea7d89c4420ca97e430d3f810280";
 
-const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
-const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
+const http = require("http");
+const axios = require("axios");
 
-async function testClientCredentials() {
-    console.log('=== Testing Client Credentials Flow ===');
-    console.log('Client ID:', SPOTIFY_CLIENT_ID ? SPOTIFY_CLIENT_ID.substring(0,8) + '...' : 'MISSING');
-    console.log('Client Secret:', SPOTIFY_CLIENT_SECRET ? SPOTIFY_CLIENT_SECRET.substring(0,8) + '...' : 'MISSING');
-    
-    try {
-        const res = await axios.post('https://accounts.spotify.com/api/token',
-            querystring.stringify({ grant_type: 'client_credentials' }), {
-            headers: {
-                'Authorization': 'Basic ' + Buffer.from(SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).toString('base64'),
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
-        });
-        console.log('✓ Client credentials token obtained!');
-        console.log('  Token prefix:', res.data.access_token.substring(0, 20) + '...');
-        console.log('  Expires in:', res.data.expires_in, 'seconds');
-        return res.data.access_token;
-    } catch (err) {
-        console.error('✗ Client credentials FAILED:', err.response?.status, err.response?.data);
-        return null;
+const REDIRECT_URI = "http://127.0.0.1:8888/callback";
+
+const SCOPES = [
+  "playlist-read-private",
+  "playlist-read-collaborative",
+  "user-library-read",
+  "user-read-email"
+].join(" ");
+
+const authUrl =
+  "https://accounts.spotify.com/authorize?" +
+  `client_id=${CLIENT_ID}` +
+  `&response_type=code` +
+  `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+  `&scope=${encodeURIComponent(SCOPES)}` +
+  `&show_dialog=true`;
+
+console.log("\n👉 Open this URL:\n");
+console.log(authUrl);
+
+http.createServer(async (req, res) => {
+  const url = new URL(req.url, "http://127.0.0.1:8888");
+
+  if (url.pathname !== "/callback") {
+    res.end("Waiting for Spotify login...");
+    return;
+  }
+
+  const code = url.searchParams.get("code");
+  if (!code) { res.end("No code found"); return; }
+  res.end("Success! Go back to terminal.");
+
+  try {
+    // STEP 1: get token
+    const tokenRes = await axios.post(
+      "https://accounts.spotify.com/api/token",
+      new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: REDIRECT_URI,
+      }),
+      {
+        headers: {
+          Authorization: "Basic " + Buffer.from(CLIENT_ID + ":" + CLIENT_SECRET).toString("base64"),
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
+    );
+    const access_token = tokenRes.data.access_token;
+    const headers = { Authorization: `Bearer ${access_token}` };
+
+    // STEP 2: who am i
+    const meRes = await axios.get("https://api.spotify.com/v1/me", { headers });
+    console.log(`\n🎵 Logged in as: ${meRes.data.display_name} (${meRes.data.email})\n`);
+
+    // STEP 3: get playlist list
+    let playlistRefs = [];
+    let urlPl = "https://api.spotify.com/v1/me/playlists?limit=50";
+    while (urlPl) {
+      const resPl = await axios.get(urlPl, { headers });
+      playlistRefs.push(...resPl.data.items);
+      urlPl = resPl.data.next;
     }
-}
+    console.log(`✅ Found ${playlistRefs.length} playlists\n`);
 
-async function testPlaylistTracks(token, playlistId) {
-    console.log(`\n=== Testing Playlist Tracks (${playlistId}) ===`);
-    try {
-        const res = await axios.get(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
-            headers: { 'Authorization': `Bearer ${token}` },
-            params: { limit: 5 }
-        });
-        console.log('✓ Playlist tracks fetched!');
-        console.log('  Total tracks:', res.data.total);
-        if (res.data.items && res.data.items.length > 0) {
-            res.data.items.forEach((item, i) => {
-                if (item.track) {
-                    console.log(`  [${i+1}] ${item.track.name} by ${item.track.artists?.map(a => a.name).join(', ')}`);
-                }
-            });
+    // STEP 4: for each playlist fetch full object and read items
+    for (const ref of playlistRefs) {
+      console.log(`\n=== ${ref.name} ===`);
+
+      try {
+        const plRes = await axios.get(`https://api.spotify.com/v1/playlists/${ref.id}`, { headers });
+        const pl = plRes.data;
+
+        // tracks are under pl.items.items, each track under item.item
+        let trackItems = [...pl.items.items];
+        let nextUrl = pl.items.next;
+
+        // paginate if more than 100 tracks
+        while (nextUrl) {
+          const nextRes = await axios.get(nextUrl, { headers });
+          trackItems.push(...nextRes.data.items);
+          nextUrl = nextRes.data.next;
         }
-        return true;
-    } catch (err) {
-        console.error('✗ Playlist tracks FAILED:', err.response?.status, JSON.stringify(err.response?.data, null, 2));
-        return false;
-    }
-}
 
-async function testGetPlaylists(token) {
-    console.log('\n=== Testing Search for a Public Playlist ===');
-    try {
-        // Try to get a well-known public playlist (Spotify's "Today's Top Hits")
-        const res = await axios.get(`https://api.spotify.com/v1/playlists/37i9dQZF1DXcBWIGoYBM5M`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+        if (trackItems.length === 0) {
+          console.log("  (empty playlist)");
+          continue;
+        }
+
+        trackItems.forEach((item, i) => {
+          const track = item.item || item.track;
+          if (!track) return;
+          const name = track.name;
+          const artists = track.artists.map(a => a.name).join(", ");
+          console.log(`  ${i + 1}. ${name} - ${artists}`);
         });
-        console.log('✓ Public playlist fetched:', res.data.name);
-        console.log('  Owner:', res.data.owner?.display_name);
-        console.log('  Tracks total:', res.data.tracks?.total);
-        return res.data.id;
-    } catch (err) {
-        console.error('✗ Public playlist fetch FAILED:', err.response?.status, JSON.stringify(err.response?.data, null, 2));
-        return null;
-    }
-}
 
-async function main() {
-    const token = await testClientCredentials();
-    if (!token) {
-        console.log('\n❌ Cannot proceed without a token.');
-        process.exit(1);
+      } catch (err) {
+        const status = err.response?.data?.error?.status;
+        const msg = err.response?.data?.error?.message || err.message;
+        console.warn(`  ⚠️  Skipped — ${status}: ${msg}`);
+      }
     }
-    
-    // Test with a well-known public playlist
-    const playlistId = await testGetPlaylists(token);
-    if (playlistId) {
-        await testPlaylistTracks(token, playlistId);
-    }
-    
-    // Also test the actual endpoint through our server
-    console.log('\n=== Testing via our server API ===');
-    try {
-        // First, get playlists (need a user token for this)
-        const serverRes = await axios.get('http://127.0.0.1:3000/api/spotify/playlists', {
-            headers: { 'Authorization': 'Bearer test-user' }
-        });
-        console.log('Server playlists response:', serverRes.status, JSON.stringify(serverRes.data).substring(0, 200));
-    } catch (err) {
-        console.log('Server playlists response:', err.response?.status, JSON.stringify(err.response?.data));
-    }
-}
 
-main();
+    console.log("\n✅ Done!\n");
+    process.exit();
+
+  } catch (err) {
+    console.error("\n❌ ERROR:\n", err.response?.data || err.message);
+    process.exit(1);
+  }
+}).listen(8888, () => {
+  console.log("\n🚀 Waiting for callback on http://127.0.0.1:8888/callback\n");
+});

@@ -757,73 +757,61 @@ app.get('/api/spotify/playlists', authenticateUser, async (req, res) => {
 });
 
 // --- Playlist Tracks ---
+// Uses the full playlist object approach (like test_spotify.js) to avoid
+// Spotify Development Mode 403 errors on the /tracks sub-resource endpoint.
 app.get('/api/spotify/playlists/:playlistId/tracks', authenticateUser, async (req, res) => {
     try {
-        let token;
-        // Try user token first
-        const userResult = await getValidSpotifyToken(req.user.user_id);
-        token = userResult.token;
-
-        let spotifyRes;
-        const params = { limit: 100 };
-        
-        // Attempt with user token first, then fallback to client credentials
-        if (token) {
-            try {
-                spotifyRes = await axios.get(`https://api.spotify.com/v1/playlists/${req.params.playlistId}/tracks`, {
-                    headers: { 'Authorization': `Bearer ${token}` }, params
-                });
-            } catch (userErr) {
-                const errMsg = JSON.stringify(userErr.response?.data || userErr.message);
-                console.error(`User token failed for playlist tracks (${req.params.playlistId}):`, errMsg);
-                require('fs').appendFileSync('spotify_err.log', new Date().toISOString() + ' UserErr: ' + errMsg + '\n');
-                // Fall through to client credentials fallback
-                token = null;
-            }
+        const { error: tokenError, token } = await getValidSpotifyToken(req.user.user_id);
+        if (tokenError) {
+            return res.status(401).json({ error: 'Spotify not connected. Go to Settings to connect your account.' });
         }
 
-        // Fallback: try client credentials for public playlists
-        if (!spotifyRes) {
-            const ccResult = await getClientCredentialsToken();
-            if (!ccResult.token) {
-                return res.status(401).json({ error: 'Spotify not connected. Go to Settings to connect your account.' });
-            }
-            try {
-                spotifyRes = await axios.get(`https://api.spotify.com/v1/playlists/${req.params.playlistId}/tracks`, {
-                    headers: { 'Authorization': `Bearer ${ccResult.token}` }, params
-                });
-            } catch (ccErr) {
-                console.error(`Client credentials also failed for playlist tracks:`, ccErr.response?.status || ccErr.message);
-                const statusCode = ccErr.response?.status || 500;
-                let errorMsg = ccErr.response?.data?.error?.message || 'Failed to load tracks. This playlist may be private.';
-                
-                if (statusCode === 403) {
-                    errorMsg = "Spotify Development Mode API restriction: Cannot view tracks for playlists you don't own. Ensure you connected to Spotify and use your own playlists.";
-                }
-                
-                return res.status(statusCode).json({ error: errorMsg });
-            }
+        const headers = { 'Authorization': `Bearer ${token}` };
+        const playlistId = req.params.playlistId;
+
+        // Fetch the full playlist object (works in Development Mode, unlike /tracks)
+        const plRes = await axios.get(`https://api.spotify.com/v1/playlists/${playlistId}`, { headers });
+        const pl = plRes.data;
+
+        // Tracks can be under pl.tracks.items or pl.items.items depending on API version
+        const tracksObj = pl.tracks || pl.items;
+        let trackItems = [...(tracksObj?.items || [])];
+        let nextUrl = tracksObj?.next || null;
+
+        // Paginate if more than 100 tracks
+        while (nextUrl) {
+            const nextRes = await axios.get(nextUrl, { headers });
+            trackItems.push(...(nextRes.data.items || []));
+            nextUrl = nextRes.data.next;
         }
 
-        const items = spotifyRes.data?.items || [];
-        const tracks = items
-            .filter(item => item && item.track && !item.track.is_local)
-            .map(item => ({
-                name: item.track.name,
-                artist: item.track.artists?.map(a => a.name).join(', ') || 'Unknown Artist',
-                album: item.track.album?.name || 'Unknown Album',
-                image: item.track.album?.images?.[2]?.url || item.track.album?.images?.[0]?.url || null,
-                duration_ms: item.track.duration_ms || 0,
-                external_url: item.track.external_urls?.spotify || null,
-                uri: item.track.uri || null,
-                id: item.track.id || null
-            }));
+        const tracks = trackItems
+            .filter(item => {
+                const track = item?.track || item?.item;
+                return track && !track.is_local;
+            })
+            .map(item => {
+                const track = item.track || item.item;
+                return {
+                    name: track.name,
+                    artist: track.artists?.map(a => a.name).join(', ') || 'Unknown Artist',
+                    album: track.album?.name || 'Unknown Album',
+                    image: track.album?.images?.[2]?.url || track.album?.images?.[0]?.url || null,
+                    duration_ms: track.duration_ms || 0,
+                    external_url: track.external_urls?.spotify || null,
+                    uri: track.uri || null,
+                    id: track.id || null
+                };
+            });
 
         res.json({ tracks });
     } catch (err) {
         console.error("Playlist Tracks Error:", err.response?.status, err.response?.data || err.message);
         const statusCode = err.response?.status || 500;
-        const errorMsg = err.response?.data?.error?.message || err.message || 'Failed to load tracks';
+        let errorMsg = err.response?.data?.error?.message || err.message || 'Failed to load tracks';
+        if (statusCode === 403) {
+            errorMsg = "Cannot access this playlist. Make sure you're connected to Spotify and this is your own playlist.";
+        }
         res.status(statusCode).json({ error: errorMsg });
     }
 });
