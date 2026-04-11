@@ -738,16 +738,18 @@ app.get('/api/spotify/playlists', authenticateUser, async (req, res) => {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        const playlists = spotifyRes.data.items.map(pl => ({
-            id: pl.id,
-            name: pl.name,
-            description: pl.description || '',
-            image: pl.images?.[0]?.url || null,
-            track_count: pl.tracks?.total || 0,
-            owner: pl.owner?.display_name || 'Unknown',
-            external_url: pl.external_urls?.spotify || null,
-            is_collaborative: pl.collaborative
-        }));
+        const playlists = (spotifyRes.data.items || [])
+            .filter(pl => pl && pl.id && pl.name)
+            .map(pl => ({
+                id: pl.id,
+                name: pl.name,
+                description: pl.description || '',
+                image: pl.images?.[0]?.url || null,
+                track_count: pl.tracks?.total || 0,
+                owner: pl.owner?.display_name || 'Unknown',
+                external_url: pl.external_urls?.spotify || null,
+                is_collaborative: pl.collaborative
+            }));
 
         res.json({ playlists });
     } catch (err) {
@@ -1446,6 +1448,46 @@ app.post('/api/playlists/compare', authenticateUser, async (req, res) => {
     }
 });
 
+// --- Delete Internal Playlist ---
+app.delete('/api/playlists/internal/:id', authenticateUser, async (req, res) => {
+    try {
+        const playlistId = req.params.id;
+        const userId = req.user.user_id;
+
+        const { data: pl, error: fetchErr } = await supabase.from('playlists').select('creator_id').eq('playlist_id', playlistId).single();
+        if (fetchErr || !pl) {
+            return res.status(404).json({ error: "Playlist not found" });
+        }
+        if (pl.creator_id !== userId) {
+            return res.status(403).json({ error: "Only the playlist owner can delete this playlist" });
+        }
+
+        // 1. Get all version IDs for this playlist
+        const { data: versions } = await supabase.from('playlist_versions')
+            .select('version_id').eq('playlist_id', playlistId);
+
+        if (versions && versions.length > 0) {
+            const versionIds = versions.map(v => v.version_id);
+            // 2. Delete playlist_songs that reference these versions
+            await supabase.from('playlist_songs').delete().in('version_id', versionIds);
+        }
+
+        // 3. Delete playlist_versions
+        await supabase.from('playlist_versions').delete().eq('playlist_id', playlistId);
+
+        // 4. Delete playlist_collaborators
+        await supabase.from('playlist_collaborators').delete().eq('playlist_id', playlistId);
+
+        // 5. Now delete the playlist itself
+        const { error } = await supabase.from('playlists').delete().eq('playlist_id', playlistId);
+        if (error) throw error;
+
+        res.json({ message: "Playlist deleted successfully" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- UC9: Trending Songs ---
 app.get('/api/trending', authenticateUser, async (req, res) => {
     try {
@@ -1862,6 +1904,575 @@ app.get('/api/playlists/internal', authenticateUser, async (req, res) => {
         if (error) throw error;
         res.json({ playlists: data || [] });
     } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ===================================================================
+// AUDIO FEATURE ANALYSIS
+// ===================================================================
+
+// --- Single Track Audio Features ---
+app.get('/api/songs/:trackId/audio-features', authenticateUser, async (req, res) => {
+    const trackId = req.params.trackId;
+    if (!trackId) return res.status(400).json({ error: "Track ID is required" });
+
+    try {
+        // Check cache in audio_features table first
+        const { data: cached } = await supabase.from('audio_features')
+            .select('*')
+            .eq('song_id', trackId)
+            .limit(1);
+
+        if (cached && cached.length > 0) {
+            return res.json({ features: cached[0], source: 'cache' });
+        }
+
+        let features = null;
+        let apiForbidden = false;
+
+        // Try user token first, then client credentials
+        const { token: userToken } = await getValidSpotifyToken(req.user.user_id);
+        const tokenToUse = userToken || (await getClientCredentialsToken()).token;
+
+        if (tokenToUse) {
+            // Try Spotify audio-features API: GET /v1/audio-features/{id}
+            try {
+                const featRes = await axios.get(`https://api.spotify.com/v1/audio-features/${trackId}`, {
+                    headers: { 'Authorization': `Bearer ${tokenToUse}` }
+                });
+                if (featRes.data && featRes.data.danceability !== undefined) {
+                    features = {
+                        tempo: featRes.data.tempo,
+                        energy: featRes.data.energy,
+                        key: featRes.data.key,
+                        valence: featRes.data.valence,
+                        danceability: featRes.data.danceability,
+                        acousticness: featRes.data.acousticness,
+                        instrumentalness: featRes.data.instrumentalness,
+                        liveness: featRes.data.liveness,
+                        speechiness: featRes.data.speechiness,
+                        loudness: featRes.data.loudness,
+                        mode: featRes.data.mode === 1,
+                        time_signature: featRes.data.time_signature,
+                        duration_ms: featRes.data.duration_ms,
+                        source: 'spotify'
+                    };
+                }
+            } catch (apiErr) {
+                if (apiErr.response?.status !== 403) {
+                    console.log("Audio features API error for track", trackId, ":", apiErr.response?.status, apiErr.response?.data?.error || apiErr.message);
+                } else {
+                    apiForbidden = true;
+                }
+            }
+
+            // If audio-features failed (but not because it's forbidden completely), try audio-analysis
+            if (!features && !apiForbidden) {
+                try {
+                    const analysisRes = await axios.get(`https://api.spotify.com/v1/audio-analysis/${trackId}`, {
+                        headers: { 'Authorization': `Bearer ${tokenToUse}` }
+                    });
+                    const t = analysisRes.data?.track;
+                    if (t && t.tempo !== undefined) {
+                        features = {
+                            tempo: t.tempo,
+                            energy: null,
+                            key: t.key,
+                            valence: null,
+                            danceability: null,
+                            acousticness: null,
+                            instrumentalness: null,
+                            liveness: null,
+                            speechiness: null,
+                            loudness: t.loudness,
+                            mode: t.mode === 1,
+                            time_signature: t.time_signature,
+                            duration_ms: Math.round((t.duration || 0) * 1000),
+                            source: 'audio-analysis'
+                        };
+                    }
+                } catch (analysisErr) {
+                    if (analysisErr.response?.status !== 403) {
+                        console.log("Audio analysis API also failed for track", trackId, ":", analysisErr.response?.status || analysisErr.message);
+                    }
+                }
+            }
+        }
+
+        // Fallback: estimate features from track metadata
+        if (!features) {
+            try {
+                const token = userToken || (await getClientCredentialsToken()).token;
+                if (token) {
+                    const trackRes = await axios.get(`https://api.spotify.com/v1/tracks/${trackId}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const track = trackRes.data;
+                    const popularity = (track.popularity || 50) / 100;
+                    const durationMin = (track.duration_ms || 200000) / 60000;
+
+                    features = {
+                        tempo: 80 + Math.round(popularity * 80),
+                        energy: Math.min(1, 0.3 + popularity * 0.6),
+                        key: Math.floor(Math.random() * 12),
+                        valence: Math.min(1, 0.2 + popularity * 0.6),
+                        danceability: Math.min(1, 0.3 + popularity * 0.5),
+                        acousticness: Math.max(0, 0.8 - popularity * 0.7),
+                        instrumentalness: durationMin > 5 ? 0.4 : 0.05,
+                        liveness: 0.15 + Math.random() * 0.3,
+                        speechiness: 0.05 + Math.random() * 0.1,
+                        loudness: -15 + popularity * 10,
+                        mode: Math.random() > 0.4,
+                        time_signature: 4,
+                        duration_ms: track.duration_ms || 0,
+                        source: 'estimated'
+                    };
+                }
+            } catch (e) {
+                console.error("Fallback estimation failed:", e.message);
+            }
+        }
+
+        if (!features) {
+            return res.status(404).json({ error: "Could not retrieve audio features for this track" });
+        }
+
+        // Cache in database (best-effort)
+        try {
+            await supabase.from('audio_features').insert([{
+                song_id: trackId,
+                tempo: features.tempo,
+                energy: features.energy,
+                key: features.key,
+                valence: features.valence,
+                danceability: features.danceability,
+                acousticness: features.acousticness,
+                instrumentalness: features.instrumentalness,
+                liveness: features.liveness,
+                speechiness: features.speechiness,
+                loudness: features.loudness,
+                mode: features.mode,
+                time_signature: features.time_signature,
+                fetched_at: new Date().toISOString(),
+                source: features.source
+            }]);
+        } catch (cacheErr) {
+            // Non-fatal — caching is best-effort
+        }
+
+        res.json({ features, source: features.source });
+    } catch (err) {
+        console.error("Audio Features Error:", err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- Playlist Audio Features (batch + aggregated) ---
+app.get('/api/playlists/:playlistId/audio-features', authenticateUser, async (req, res) => {
+    try {
+        const { error: tokenError, token } = await getValidSpotifyToken(req.user.user_id);
+        if (tokenError) return res.status(401).json({ error: tokenError });
+
+        const playlistId = req.params.playlistId;
+        const isInternal = playlistId.length === 36 && playlistId.includes('-');
+        let trackItems = [];
+
+        if (isInternal) {
+            // Fetch internal playlist tracks from DB
+            const { data: dbTracks } = await supabase.from('playlist_tracks')
+                .select('*')
+                .eq('playlist_id', playlistId)
+                .order('position', { ascending: true });
+
+            trackItems = (dbTracks || []).map(t => ({
+                id: t.song_id,
+                name: t.title,
+                artists: [{ name: t.artist }],
+                popularity: 50, // default estimation factor
+                duration_ms: t.duration_ms || 200000
+            }));
+        } else {
+            // Fetch Spotify playlist tracks from Spotify API
+            const plRes = await axios.get(`https://api.spotify.com/v1/playlists/${playlistId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            const tracksObj = plRes.data.tracks || plRes.data.items;
+            let trackItemsRaw = [...(tracksObj?.items || [])];
+            let nextUrl = tracksObj?.next || null;
+
+            // Paginate if more than 100 tracks
+            while (nextUrl) {
+                try {
+                    const nextRes = await axios.get(nextUrl, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    trackItemsRaw.push(...(nextRes.data.items || []));
+                    nextUrl = nextRes.data.next;
+                } catch (e) {
+                    nextUrl = null;
+                }
+            }
+
+            trackItems = trackItemsRaw
+                .map(item => item?.track || item?.item)
+                .filter(track => track && !track.is_local && track.id);
+        }
+
+        if (trackItems.length === 0) {
+            return res.json({ tracks: [], averages: null });
+        }
+
+        const ids = trackItems.map(t => t.id);
+        let allFeatures = [];
+        let batchSucceeded = false;
+        let apiForbidden = false;
+
+        // Strategy 1: Batch fetch audio features (up to 100 IDs at a time)
+        for (let i = 0; i < ids.length; i += 100) {
+            const batch = ids.slice(i, i + 100);
+            try {
+                const featRes = await axios.get('https://api.spotify.com/v1/audio-features', {
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    params: { ids: batch.join(',') }
+                });
+                const features = (featRes.data.audio_features || []);
+                allFeatures.push(...features);
+                batchSucceeded = true;
+            } catch (batchErr) {
+                if (batchErr.response?.status === 403) {
+                    apiForbidden = true;
+                } else {
+                    console.log("Batch audio-features failed:", batchErr.response?.status, batchErr.response?.data?.error || batchErr.message);
+                }
+                break; // Don't continue batching if one fails
+            }
+        }
+
+        // Strategy 2: If batch failed, fall back
+        if (!batchSucceeded) {
+            allFeatures = [];
+            
+            // If the API is completely forbidden (403), don't waste time making individual requests
+            // that will also fail and get rate-limited. Immediately estimate for all tracks.
+            if (apiForbidden) {
+                for (const id of ids) {
+                    const track = trackItems.find(t => t.id === id);
+                    const pop = (track?.popularity || 50) / 100;
+                    allFeatures.push({
+                        id,
+                        tempo: 80 + Math.round(pop * 80),
+                        energy: Math.min(1, 0.3 + pop * 0.6),
+                        valence: Math.min(1, 0.2 + pop * 0.6),
+                        danceability: Math.min(1, 0.3 + pop * 0.5),
+                        acousticness: Math.max(0, 0.8 - pop * 0.7),
+                        liveness: 0.15 + Math.random() * 0.3,
+                        speechiness: 0.05 + Math.random() * 0.1,
+                        instrumentalness: 0.05,
+                        loudness: -15 + pop * 10,
+                        _estimated: true
+                    });
+                }
+            } else {
+                console.log("Falling back to individual audio-features calls for", ids.length, "tracks");
+                for (const id of ids) {
+                    try {
+                        const featRes = await axios.get(`https://api.spotify.com/v1/audio-features/${id}`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (featRes.data && featRes.data.danceability !== undefined) {
+                            allFeatures.push(featRes.data);
+                        } else {
+                            allFeatures.push(null);
+                        }
+                    } catch (e) {
+                        try {
+                            const analysisRes = await axios.get(`https://api.spotify.com/v1/audio-analysis/${id}`, {
+                                headers: { 'Authorization': `Bearer ${token}` }
+                            });
+                            const t = analysisRes.data?.track;
+                            if (t) {
+                                allFeatures.push({
+                                    id,
+                                    tempo: t.tempo, energy: null, valence: null,
+                                    danceability: null, acousticness: null,
+                                    instrumentalness: null, liveness: null,
+                                    speechiness: null, loudness: t.loudness,
+                                    key: t.key, mode: t.mode,
+                                    time_signature: t.time_signature,
+                                    _from_analysis: true
+                                });
+                            } else {
+                                allFeatures.push(null);
+                            }
+                        } catch (e2) {
+                            // Use estimation for this track
+                            const track = trackItems.find(t => t.id === id);
+                            const pop = (track?.popularity || 50) / 100;
+                            allFeatures.push({
+                                id,
+                                tempo: 80 + Math.round(pop * 80),
+                                energy: Math.min(1, 0.3 + pop * 0.6),
+                                valence: Math.min(1, 0.2 + pop * 0.6),
+                                danceability: Math.min(1, 0.3 + pop * 0.5),
+                                acousticness: Math.max(0, 0.8 - pop * 0.7),
+                                liveness: 0.15 + Math.random() * 0.3,
+                                speechiness: 0.05 + Math.random() * 0.1,
+                                instrumentalness: 0.05,
+                                loudness: -15 + pop * 10,
+                                _estimated: true
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        // Filter null entries and build per-track results
+        const validFeatures = allFeatures.filter(f => f !== null);
+        const trackFeatures = validFeatures.map(f => {
+            const track = trackItems.find(t => t.id === f.id);
+            return {
+                id: f.id,
+                name: track?.name || 'Unknown',
+                artist: track?.artists?.map(a => a.name).join(', ') || 'Unknown',
+                tempo: f.tempo,
+                energy: f.energy,
+                valence: f.valence,
+                danceability: f.danceability,
+                acousticness: f.acousticness,
+                liveness: f.liveness || 0,
+                speechiness: f.speechiness || 0,
+                instrumentalness: f.instrumentalness,
+                loudness: f.loudness,
+                estimated: !!(f._estimated || f._from_analysis)
+            };
+        });
+
+        // Calculate averages
+        const avg = (arr, key) => {
+            const vals = arr.map(a => a[key]).filter(v => v !== undefined && v !== null && !isNaN(v));
+            return vals.length > 0 ? +(vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(3) : 0;
+        };
+
+        const averages = {
+            tempo: Math.round(avg(trackFeatures, 'tempo')),
+            energy: avg(trackFeatures, 'energy'),
+            valence: avg(trackFeatures, 'valence'),
+            danceability: avg(trackFeatures, 'danceability'),
+            acousticness: avg(trackFeatures, 'acousticness'),
+            liveness: avg(trackFeatures, 'liveness'),
+            speechiness: avg(trackFeatures, 'speechiness'),
+            instrumentalness: avg(trackFeatures, 'instrumentalness'),
+            loudness: avg(trackFeatures, 'loudness'),
+            track_count: trackFeatures.length
+        };
+
+        res.json({ tracks: trackFeatures, averages });
+    } catch (err) {
+        console.error("Playlist Audio Features Error:", err.response?.data || err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ===================================================================
+// SMART PLAYLIST VERSIONING
+// ===================================================================
+
+// --- List versions for a playlist ---
+app.get('/api/playlists/:id/versions', authenticateUser, async (req, res) => {
+    try {
+        const playlistId = req.params.id;
+
+        const { data: versions, error } = await supabase.from('playlist_versions')
+            .select('version_id, created_by, snapshot_date, label, is_manual, users!created_by(username)')
+            .eq('playlist_id', playlistId)
+            .order('snapshot_date', { ascending: false });
+
+        if (error) throw error;
+
+        // Get song counts for each version
+        const enrichedVersions = await Promise.all((versions || []).map(async (v) => {
+            const { data: songs } = await supabase.from('playlist_songs')
+                .select('mapping_id')
+                .eq('version_id', v.version_id);
+
+            return {
+                version_id: v.version_id,
+                label: v.label || 'Unnamed snapshot',
+                snapshot_date: v.snapshot_date,
+                is_manual: v.is_manual,
+                created_by: v.users?.username || 'Unknown',
+                song_count: songs?.length || 0
+            };
+        }));
+
+        res.json({ versions: enrichedVersions });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- Get tracks for a specific version ---
+app.get('/api/playlists/versions/:versionId/tracks', authenticateUser, async (req, res) => {
+    try {
+        const { data, error } = await supabase.from('playlist_songs')
+            .select('added_by, added_at, songs(song_id, title, artist, album, duration_ms, spotify_uri)')
+            .eq('version_id', req.params.versionId)
+            .order('added_at', { ascending: true });
+
+        if (error) throw error;
+
+        const tracks = (data || [])
+            .filter(d => d.songs)
+            .map(d => ({
+                ...d.songs,
+                added_by: d.added_by,
+                added_at: d.added_at
+            }));
+
+        res.json({ tracks });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ===================================================================
+// ARTIST DISCOVERY
+// ===================================================================
+
+app.get('/api/discover/artists', authenticateUser, async (req, res) => {
+    const { genre, based_on, limit: rawLimit } = req.query;
+    const limit = Math.min(parseInt(rawLimit) || 10, 10);
+
+    try {
+        let token = null;
+        let useProfile = based_on === 'profile';
+
+        // If based on profile, we need user token for top artists
+        if (useProfile) {
+            const { error: tokenError, token: userToken } = await getValidSpotifyToken(req.user.user_id);
+            if (tokenError) {
+                // Fall back to genre-only search with client credentials
+                useProfile = false;
+            } else {
+                token = userToken;
+            }
+        }
+
+        // Use client credentials if no user token
+        if (!token) {
+            const { error: ccError, token: ccToken } = await getClientCredentialsToken();
+            if (ccError) return res.status(500).json({ error: ccError });
+            token = ccToken;
+        }
+
+        const headers = { 'Authorization': `Bearer ${token}` };
+        let artists = [];
+
+        if (useProfile) {
+            // Get user's top artists and find related artists
+            try {
+                const topRes = await axios.get('https://api.spotify.com/v1/me/top/artists', {
+                    headers,
+                    params: { time_range: 'medium_term', limit: 5 }
+                });
+
+                const topArtists = topRes.data.items || [];
+                const seenIds = new Set(topArtists.map(a => a.id));
+
+                // Get related artists for each top artist
+                const relatedPromises = topArtists.slice(0, 3).map(a =>
+                    axios.get(`https://api.spotify.com/v1/artists/${a.id}/related-artists`, { headers })
+                        .catch(() => ({ data: { artists: [] } }))
+                );
+
+                const relatedResults = await Promise.all(relatedPromises);
+                relatedResults.forEach(r => {
+                    (r.data.artists || []).forEach(a => {
+                        if (!seenIds.has(a.id)) {
+                            seenIds.add(a.id);
+                            artists.push({
+                                id: a.id,
+                                name: a.name,
+                                image: a.images?.[1]?.url || a.images?.[0]?.url || null,
+                                genres: (a.genres || []).slice(0, 3),
+                                popularity: a.popularity || 0,
+                                followers: a.followers?.total || 0,
+                                external_url: a.external_urls?.spotify || null
+                            });
+                        }
+                    });
+                });
+
+                // Sort by popularity
+                artists.sort((a, b) => b.popularity - a.popularity);
+            } catch (e) {
+                console.error("Profile-based discovery failed:", e.message);
+            }
+        }
+
+        // Genre-based search (always used as primary or fallback)
+        if (artists.length < limit) {
+            const searchGenre = genre || 'pop';
+            const remaining = limit - artists.length;
+
+            try {
+                const searchRes = await axios.get('https://api.spotify.com/v1/search', {
+                    headers,
+                    params: {
+                        q: `genre:${searchGenre}`,
+                        type: 'artist',
+                        limit: Math.min(remaining, 10),
+                        market: 'US'
+                    }
+                });
+
+                const seenIds = new Set(artists.map(a => a.id));
+                (searchRes.data.artists?.items || []).forEach(a => {
+                    if (!seenIds.has(a.id)) {
+                        seenIds.add(a.id);
+                        artists.push({
+                            id: a.id,
+                            name: a.name,
+                            image: a.images?.[1]?.url || a.images?.[0]?.url || null,
+                            genres: (a.genres || []).slice(0, 3),
+                            popularity: a.popularity || 0,
+                            followers: a.followers?.total || 0,
+                            external_url: a.external_urls?.spotify || null
+                        });
+                    }
+                });
+            } catch (e) {
+                console.error("Genre search failed:", JSON.stringify(e.response?.data), "PARAMS:", { q: 'genre:' + searchGenre, type: 'artist', limit: Math.min(remaining, 10) });
+            }
+        }
+
+        // Fetch top tracks for the first few artists
+        const topArtists = artists.slice(0, limit);
+        const enrichPromises = topArtists.slice(0, 10).map(async (a) => {
+            try {
+                const ttRes = await axios.get(`https://api.spotify.com/v1/artists/${a.id}/top-tracks`, {
+                    headers,
+                    params: { market: 'US' }
+                });
+                a.top_tracks = (ttRes.data.tracks || []).slice(0, 3).map(t => ({
+                    name: t.name,
+                    external_url: t.external_urls?.spotify || null,
+                    image: t.album?.images?.[2]?.url || null
+                }));
+            } catch (e) {
+                a.top_tracks = [];
+            }
+            return a;
+        });
+
+        await Promise.all(enrichPromises);
+
+        res.json({ artists: topArtists.slice(0, limit) });
+    } catch (err) {
+        console.error("Artist Discovery Error:", err.response?.data || err.message);
         res.status(500).json({ error: err.message });
     }
 });

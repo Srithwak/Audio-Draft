@@ -101,25 +101,33 @@
             color: var(--text-secondary);
         }
 
-        .playlist-card__actions {
+        .track-panel__actions {
             display: flex;
             gap: 8px;
-            margin-top: 12px;
-            flex-wrap: wrap;
+            padding: 12px 24px;
+            border-bottom: 1px solid var(--border-color);
         }
 
-        .playlist-card__actions .btn--sm {
-            padding: 4px 10px;
-            font-size: 0.75rem;
-            border-radius: 6px;
+        .track-panel__actions .btn--sm {
+            padding: 8px 14px;
+            font-size: 0.8rem;
+            font-family: inherit;
+            line-height: 1;
+            border-radius: 8px;
             border: 1px solid var(--border-color);
             background: rgba(255, 255, 255, 0.03);
             color: var(--text-secondary);
             cursor: pointer;
             transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            flex: 1;
+            justify-content: center;
         }
 
-        .playlist-card__actions .btn--sm:hover {
+        .track-panel__actions .btn--sm:hover {
             background: var(--accent-purple);
             color: white;
             border-color: var(--accent-purple);
@@ -376,6 +384,7 @@
                 <a href="dashboard.html" class="sidebar__link">Dashboard</a>
                 <a href="social.html" class="sidebar__link">Social</a>
                 <a href="playlists.html" class="sidebar__link active">Playlists</a>
+                <a href="discover.html" class="sidebar__link">Discover</a>
                 <a href="analytics.html" class="sidebar__link">Analytics</a>
                 <a href="settings.html" class="sidebar__link">Settings</a>
             </nav>
@@ -437,6 +446,7 @@
             <div class="track-panel__title" id="panel-playlist-name">Playlist</div>
             <button class="track-panel__close" id="close-panel">&times;</button>
         </div>
+        <div class="track-panel__actions" id="panel-actions" style="display: none;"></div>
         <div class="track-panel__list" id="panel-track-list">
             <div style="text-align: center; padding: 32px; color: var(--text-secondary);">Select a playlist to view
                 tracks.</div>
@@ -497,6 +507,49 @@
         </div>
     </div>
 
+
+    <!-- Version History Modal -->
+    <div class="modal-overlay" id="versions-modal-overlay">
+        <div class="modal" style="max-width: 640px;">
+            <h3>📜 Version History</h3>
+            <p style="color: var(--text-secondary); font-size: 0.9rem;" id="versions-playlist-name"></p>
+            <div id="versions-container" style="margin-top: 16px;">
+                <p style="color: var(--text-secondary); text-align: center;">Loading...</p>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn--dark" id="versions-modal-close">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Playlist Analysis Modal -->
+    <div class="modal-overlay" id="playlist-analysis-modal-overlay">
+        <div class="modal" style="max-width: 560px;">
+            <h3>🔬 Playlist Audio Analysis</h3>
+            <p style="color: var(--text-secondary); font-size: 0.9rem;" id="playlist-analysis-name"></p>
+            <div id="playlist-analysis-content" style="margin-top: 20px;">
+                <p style="color: var(--text-secondary); text-align: center;">Loading...</p>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn--dark" id="playlist-analysis-close">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Song Analysis Modal (for individual tracks in playlists) -->
+    <div class="modal-overlay" id="song-analysis-modal-overlay">
+        <div class="modal" style="max-width: 520px;">
+            <h3>🔬 Audio Feature Analysis</h3>
+            <p style="color: var(--text-secondary); font-size: 0.9rem;" id="song-analysis-modal-song"></p>
+            <div id="song-analysis-content" style="margin-top: 20px;">
+                <p style="color: var(--text-secondary); text-align: center;">Loading...</p>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn--dark" id="song-analysis-close">Close</button>
+            </div>
+        </div>
+    </div>
+
     <script src="js/main.js"></script>
     <script>
         let allSpotifyPlaylists = [];
@@ -543,7 +596,28 @@
                 document.getElementById('invite-modal-overlay').classList.remove('open');
             });
             document.getElementById('invite-modal-send').addEventListener('click', sendInvite);
+
+            // Versions modal
+            document.getElementById('versions-modal-close').addEventListener('click', () => {
+                document.getElementById('versions-modal-overlay').classList.remove('open');
+            });
+
+            // Analysis modal
+            document.getElementById('playlist-analysis-close').addEventListener('click', () => {
+                document.getElementById('playlist-analysis-modal-overlay').classList.remove('open');
+            });
+
+            // Song analysis modal
+            document.getElementById('song-analysis-close').addEventListener('click', () => {
+                document.getElementById('song-analysis-modal-overlay').classList.remove('open');
+            });
         });
+
+        // Helper to safely escape text for HTML attributes (sanitize handles XSS,
+        // this also escapes backticks and ${} which break template literals)
+        function escapeForAttr(str) {
+            return sanitize(str).replace(/"/g, '&quot;').replace(/`/g, '&#96;').replace(/\$/g, '&#36;');
+        }
 
         async function loadSpotifyPlaylists() {
             const container = document.getElementById("playlists-container");
@@ -555,7 +629,7 @@
                     return;
                 }
                 const data = await res.json();
-                allSpotifyPlaylists = data.playlists || [];
+                allSpotifyPlaylists = (data.playlists || []).filter(pl => pl && pl.id && pl.name);
 
                 if (allSpotifyPlaylists.length === 0) {
                     container.innerHTML = '<div class="empty-state"><h3>No Playlists</h3><p>You don\'t have any playlists on Spotify yet.</p></div>';
@@ -563,18 +637,17 @@
                 }
 
                 container.innerHTML = allSpotifyPlaylists.map(pl => {
+                    const safeName = escapeForAttr(pl.name);
+                    const safeOwner = sanitize(pl.owner || 'Unknown');
                     const imgHtml = pl.image
-                        ? `<img class="playlist-card__img" src="${pl.image}" alt="${pl.name}">`
+                        ? `<img class="playlist-card__img" src="${pl.image}" alt="${safeName}">`
                         : `<div class="playlist-card__img" style="display: flex; align-items: center; justify-content: center; font-size: 2rem; color: var(--text-secondary);">🎵</div>`;
                     return `
-                    <div class="playlist-card" data-id="${pl.id}" data-name="${sanitize(pl.name)}">
+                    <div class="playlist-card" data-id="${pl.id}" data-name="${safeName}">
                         ${imgHtml}
                         <div class="playlist-card__body">
                             <div class="playlist-card__title">${sanitize(pl.name)}</div>
-                            <div class="playlist-card__meta">${pl.track_count} tracks · ${sanitize(pl.owner)}</div>
-                            <div class="playlist-card__actions" onclick="event.stopPropagation();">
-                                <button class="btn--sm" onclick="openCompareModal('${pl.id}', '${sanitize(pl.name).replace(/'/g, "\\'")}')">📊 Compare</button>
-                            </div>
+                            <div class="playlist-card__meta">${pl.track_count || 0} tracks · ${safeOwner}</div>
                         </div>
                     </div>`;
                 }).join('');
@@ -620,6 +693,8 @@
                             <button class="btn btn--dark" style="font-size: 0.8rem; padding: 6px 12px;" onclick="openRenameModal('${pl.playlist_id}', '${sanitize(pl.name).replace(/'/g, "\\\\'")}')">✏️ Rename</button>
                             <button class="btn btn--dark" style="font-size: 0.8rem; padding: 6px 12px;" onclick="exportPlaylist('${pl.playlist_id}')">📤 Export</button>
                             <button class="btn btn--dark" style="font-size: 0.8rem; padding: 6px 12px;" onclick="openInviteModal('${pl.playlist_id}')">👥 Invite</button>
+                            <button class="btn btn--dark" style="font-size: 0.8rem; padding: 6px 12px;" onclick="openVersionsModal('${pl.playlist_id}', '${sanitize(pl.name).replace(/'/g, "\\\\'")}')">📜 Versions</button>
+                            <button class="btn btn--dark" style="font-size: 0.8rem; padding: 6px 12px; color: #f87171; border-color: rgba(248,113,113,0.3);" onclick="deleteInternalPlaylist('${pl.playlist_id}')">🗑 Delete</button>
                         </div>
                     </div>
                 `).join('');
@@ -652,9 +727,24 @@
             const overlay = document.getElementById("track-overlay");
             const nameEl = document.getElementById("panel-playlist-name");
             const listEl = document.getElementById("panel-track-list");
+            const actionsEl = document.getElementById("panel-actions");
 
             nameEl.textContent = playlistName;
             listEl.innerHTML = '<div style="text-align: center; padding: 32px; color: var(--text-secondary);">Loading tracks...</div>';
+            
+            // Show Analyze & Compare buttons in the panel
+            actionsEl.style.display = 'flex';
+            actionsEl.innerHTML = `
+                <button class="btn--sm" id="panel-analyze-btn">🔬 Analyze</button>
+                <button class="btn--sm" id="panel-compare-btn">📊 Compare</button>
+            `;
+            document.getElementById('panel-analyze-btn').addEventListener('click', () => {
+                analyzePlaylist(playlistId, playlistName);
+            });
+            document.getElementById('panel-compare-btn').addEventListener('click', () => {
+                openCompareModal(playlistId, playlistName);
+            });
+
             panel.classList.add("open");
             overlay.classList.add("open");
 
@@ -689,6 +779,12 @@
                     const imgHtml = t.image
                         ? `<img class="track-item__img" src="${t.image}" alt="">`
                         : `<div class="track-item__img"></div>`;
+                    const trackId = t.id || '';
+                    const safeName = sanitize(t.name).replace(/'/g, "\\'");
+                    const safeArtist = sanitize(t.artist).replace(/'/g, "\\'");
+                    const analyzeBtn = trackId
+                        ? `<button class="btn--icon" style="background: none; border: 1px solid var(--border-color); color: var(--text-secondary); padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; flex-shrink: 0;" onclick="event.stopPropagation(); openSongAnalysisModal('${trackId}', '${safeName}', '${safeArtist}')" title="Analyze">🔬</button>`
+                        : '';
                     return `
                     <div class="track-item">
                         ${imgHtml}
@@ -697,6 +793,7 @@
                             <div class="track-item__artist">${sanitize(t.artist)}</div>
                         </div>
                         <div class="track-item__duration">${mins}:${secs}</div>
+                        ${analyzeBtn}
                     </div>`;
                 }).join('');
             } catch (err) {
@@ -735,6 +832,12 @@
                 listEl.innerHTML = data.tracks.map((t) => {
                     const mins = Math.floor((t.duration_ms || 0) / 60000);
                     const secs = Math.floor(((t.duration_ms || 0) % 60000) / 1000).toString().padStart(2, '0');
+                    const trackId = t.song_id || '';
+                    const safeName = sanitize(t.title).replace(/'/g, "\\'");
+                    const safeArtist = sanitize(t.artist).replace(/'/g, "\\'");
+                    const analyzeBtn = trackId
+                        ? `<button class="btn--icon" style="background: none; border: 1px solid var(--border-color); color: var(--text-secondary); padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; flex-shrink: 0;" onclick="event.stopPropagation(); openSongAnalysisModal('${trackId}', '${safeName}', '${safeArtist}')" title="Analyze">🔬</button>`
+                        : '';
                     return `
                     <div class="track-item">
                         <div class="track-item__img" style="display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--text-secondary);">🎵</div>
@@ -743,10 +846,11 @@
                             <div class="track-item__artist">${sanitize(t.artist)}</div>
                         </div>
                         <div class="track-item__duration">${mins}:${secs}</div>
+                        ${analyzeBtn}
                         <button class="btn btn--dark" style="background: var(--accent-red); margin-left: 8px; padding: 4px 8px; font-size: 0.75rem;" onclick="removeSongFromInternal('${playlistId}', '${t.song_id}')">Remove</button>
                     </div>`;
                 }).join('');
-                
+
                 listEl.innerHTML += `
                     <div style="padding: 24px; text-align: center;">
                         <button class="btn btn--dark" onclick="addDemoSong('${playlistId}')">+ Add Demo Song</button>
@@ -771,7 +875,7 @@
 
         async function addDemoSong(playlistId) {
             const fakeSongs = [
-                { song_name: "Collaborative Track " + Math.floor(Math.random()*100), artist: "Audio-Draft", uri: "spotify:track:4cOdK2wGLETKBW3PvgPWqT" }
+                { song_name: "Collaborative Track " + Math.floor(Math.random() * 100), artist: "Audio-Draft", uri: "spotify:track:4cOdK2wGLETKBW3PvgPWqT" }
             ];
             try {
                 const res = await apiFetch(`/api/playlists/${playlistId}/songs`, {
@@ -956,6 +1060,251 @@
                 alert('Failed to send invite');
             } finally {
                 btn.disabled = false; btn.textContent = 'Send Invite';
+            }
+        }
+
+
+        // --- Versions ---
+        let currentVersionPlaylistId = null;
+
+        function openVersionsModal(playlistId, playlistName) {
+            currentVersionPlaylistId = playlistId;
+            document.getElementById('versions-playlist-name').textContent = playlistName;
+            document.getElementById('versions-container').innerHTML = '<p style="color: var(--text-secondary); text-align: center;">Loading versions...</p>';
+            document.getElementById('versions-modal-overlay').classList.add('open');
+            loadVersions(playlistId);
+        }
+
+        async function loadVersions(playlistId) {
+            const container = document.getElementById('versions-container');
+            try {
+                const res = await apiFetch(`/api/playlists/${playlistId}/versions`);
+                const data = await res.json();
+
+                if (!res.ok) {
+                    container.innerHTML = `<p style="color: var(--accent-red);">${sanitize(data.error || 'Failed to load versions')}</p>`;
+                    return;
+                }
+
+                if (!data.versions || data.versions.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">No version history available yet.</p>';
+                    return;
+                }
+
+                container.innerHTML = '<div style="display: flex; flex-direction: column; gap: 8px;">' +
+                    data.versions.map((v, i) => {
+                        const date = new Date(v.snapshot_date).toLocaleString();
+                        const typeLabel = v.is_manual ? '✋ Manual' : '⚙️ Auto';
+                        return `
+                        <div style="padding: 14px 16px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; display: flex; justify-content: space-between; align-items: center; transition: border-color 0.2s; cursor: pointer;"
+                             onmouseover="this.style.borderColor='var(--accent-purple)'"
+                             onmouseout="this.style.borderColor='var(--border-color)'"
+                             onclick="viewVersionTracks('${v.version_id}', '${sanitize(v.label).replace(/'/g, "\\'")}')">
+                            <div>
+                                <div style="font-weight: 600; font-size: 0.9rem;">${sanitize(v.label)}</div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
+                                    ${date} · ${v.song_count} songs · by ${sanitize(v.created_by)}
+                                    <span style="margin-left: 8px; padding: 2px 8px; border-radius: 10px; font-size: 0.65rem; background: rgba(167,139,250,0.1); color: var(--accent-purple);">${typeLabel}</span>
+                                </div>
+                            </div>
+                            <div style="color: var(--text-secondary); font-size: 0.8rem;">👁 View</div>
+                        </div>`;
+                    }).join('') + '</div>';
+            } catch (err) {
+                container.innerHTML = '<p style="color: var(--accent-red);">Failed to load version history.</p>';
+            }
+        }
+
+        async function viewVersionTracks(versionId, label) {
+            const container = document.getElementById('versions-container');
+            container.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">Loading tracks for "' + sanitize(label) + '"...</p>';
+
+            try {
+                const res = await apiFetch(`/api/playlists/versions/${versionId}/tracks`);
+                const data = await res.json();
+
+                let html = `<div style="margin-bottom: 16px;">
+                    <button class="btn btn--dark" style="font-size: 0.8rem; padding: 6px 12px;" onclick="loadVersions('${currentVersionPlaylistId}')">← Back to versions</button>
+                    <span style="font-size: 0.85rem; color: var(--text-secondary); margin-left: 12px;">${sanitize(label)} · ${data.tracks.length} tracks</span>
+                </div>`;
+
+                if (!data.tracks || data.tracks.length === 0) {
+                    html += '<p style="color: var(--text-secondary); text-align: center;">No tracks in this version.</p>';
+                } else {
+                    html += data.tracks.map(t => {
+                        const mins = Math.floor((t.duration_ms || 0) / 60000);
+                        const secs = Math.floor(((t.duration_ms || 0) % 60000) / 1000).toString().padStart(2, '0');
+                        return `
+                        <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border-color);">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-weight: 600; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">🎵 ${sanitize(t.title)}</div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary);">${sanitize(t.artist)}</div>
+                            </div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); flex-shrink: 0;">${mins}:${secs}</div>
+                        </div>`;
+                    }).join('');
+                }
+
+                container.innerHTML = html;
+            } catch (err) {
+                container.innerHTML = '<p style="color: var(--accent-red);">Failed to load tracks.</p>';
+            }
+        }
+
+        // --- Playlist Analysis ---
+        async function analyzePlaylist(playlistId, playlistName) {
+            document.getElementById('playlist-analysis-name').textContent = playlistName;
+            document.getElementById('playlist-analysis-content').innerHTML = '<p style="color: var(--text-secondary); text-align: center;"><span style="display:inline-block;width:24px;height:24px;border:3px solid rgba(167,139,250,0.2);border-top-color:var(--accent-purple);border-radius:50%;animation:spin 0.8s linear infinite;"></span> Analyzing playlist...</p><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
+            document.getElementById('playlist-analysis-modal-overlay').classList.add('open');
+
+            try {
+                const res = await apiFetch(`/api/playlists/${playlistId}/audio-features`);
+                const data = await res.json();
+
+                if (!res.ok) {
+                    document.getElementById('playlist-analysis-content').innerHTML = `<p style="color: var(--accent-red); text-align: center;">${data.error || 'Failed to analyze'}</p>`;
+                    return;
+                }
+
+                if (!data.averages) {
+                    document.getElementById('playlist-analysis-content').innerHTML = '<p style="color: var(--text-secondary); text-align: center;">No tracks to analyze in this playlist.</p>';
+                    return;
+                }
+
+                const a = data.averages;
+                const features = [
+                    { label: 'Energy', value: a.energy, color: '#f87171' },
+                    { label: 'Danceability', value: a.danceability, color: '#a78bfa' },
+                    { label: 'Valence (Positivity)', value: a.valence, color: '#fbbf24' },
+                    { label: 'Acousticness', value: a.acousticness, color: '#34d399' },
+                    { label: 'Speechiness', value: a.speechiness, color: '#f472b6' },
+                    { label: 'Liveness', value: a.liveness, color: '#60a5fa' },
+                    { label: 'Instrumentalness', value: a.instrumentalness, color: '#fb923c' }
+                ];
+
+                const barsHtml = features.map(feat => {
+                    const pct = Math.round((feat.value || 0) * 100);
+                    return `
+                    <div style="margin-bottom: 14px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                            <span style="font-size: 0.82rem; font-weight: 600;">${feat.label}</span>
+                            <span style="font-size: 0.82rem; color: var(--text-secondary);">${pct}%</span>
+                        </div>
+                        <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden;">
+                            <div style="width: ${pct}%; height: 100%; background: ${feat.color}; border-radius: 4px; transition: width 0.6s ease;"></div>
+                        </div>
+                    </div>`;
+                }).join('');
+
+                const loudnessDb = typeof a.loudness === 'number' ? a.loudness.toFixed(1) : '?';
+
+                document.getElementById('playlist-analysis-content').innerHTML = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+                        <div style="text-align: center; padding: 16px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--border-color);">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-purple);">${a.tempo}</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase;">Avg BPM</div>
+                        </div>
+                        <div style="text-align: center; padding: 16px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--border-color);">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-purple);">${a.track_count}</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase;">Tracks Analyzed</div>
+                        </div>
+                        <div style="text-align: center; padding: 16px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--border-color);">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-purple);">${loudnessDb}</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase;">Avg Loudness (dB)</div>
+                        </div>
+                    </div>
+                    ${barsHtml}
+                    </div>`;
+            } catch (err) {
+                document.getElementById('playlist-analysis-content').innerHTML = '<p style="color: var(--accent-red); text-align: center;">Failed to analyze playlist.</p>';
+            }
+        }
+
+        // --- Individual Song Analysis from Playlist ---
+        async function openSongAnalysisModal(trackId, songName, artist) {
+            if (!trackId) { alert('No track ID available for analysis'); return; }
+            document.getElementById('song-analysis-modal-song').textContent = `${songName} — ${artist}`;
+            document.getElementById('song-analysis-content').innerHTML = '<p style="color: var(--text-secondary); text-align: center;"><span style="display:inline-block;width:24px;height:24px;border:3px solid rgba(167,139,250,0.2);border-top-color:var(--accent-purple);border-radius:50%;animation:spin 0.8s linear infinite;"></span> Analyzing...</p><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
+            document.getElementById('song-analysis-modal-overlay').classList.add('open');
+
+            try {
+                const res = await apiFetch(`/api/songs/${trackId}/audio-features`);
+                const data = await res.json();
+
+                if (!res.ok) {
+                    document.getElementById('song-analysis-content').innerHTML = `<p style="color: var(--accent-red); text-align: center;">${sanitize(data.error || 'Failed to analyze')}</p>`;
+                    return;
+                }
+
+                const f = data.features;
+                const keyNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+                const keyName = f.key >= 0 && f.key < 12 ? keyNames[f.key] : '?';
+                const modeName = f.mode ? 'Major' : 'Minor';
+
+                const features = [
+                    { label: 'Energy', value: f.energy, color: '#f87171' },
+                    { label: 'Danceability', value: f.danceability, color: '#a78bfa' },
+                    { label: 'Valence', value: f.valence, color: '#fbbf24' },
+                    { label: 'Acousticness', value: f.acousticness, color: '#34d399' },
+                    { label: 'Speechiness', value: f.speechiness, color: '#f472b6' },
+                    { label: 'Liveness', value: f.liveness || 0, color: '#60a5fa' },
+                    { label: 'Instrumental', value: f.instrumentalness, color: '#fb923c' }
+                ];
+
+                const barsHtml = features.map(feat => {
+                    const pct = Math.round((feat.value || 0) * 100);
+                    return `
+                    <div style="margin-bottom: 14px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                            <span style="font-size: 0.82rem; font-weight: 600;">${feat.label}</span>
+                            <span style="font-size: 0.82rem; color: var(--text-secondary);">${pct}%</span>
+                        </div>
+                        <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden;">
+                            <div style="width: ${pct}%; height: 100%; background: ${feat.color}; border-radius: 4px; transition: width 0.6s ease;"></div>
+                        </div>
+                    </div>`;
+                }).join('');
+
+                const sourceLabel = data.source === 'spotify' ? '🎵 Spotify API'
+                    : data.source === 'cache' ? '💾 Cached'
+                    : data.source === 'audio-analysis' ? '📈 Audio Analysis'
+                    : '📊 Estimated';
+
+                document.getElementById('song-analysis-content').innerHTML = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+                        <div style="text-align: center; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--border-color);">
+                            <div style="font-size: 1.3rem; font-weight: 700; color: var(--accent-purple);">${Math.round(f.tempo || 0)}</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase;">BPM</div>
+                        </div>
+                        <div style="text-align: center; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--border-color);">
+                            <div style="font-size: 1.3rem; font-weight: 700; color: var(--accent-purple);">${keyName}</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase;">${modeName}</div>
+                        </div>
+                        <div style="text-align: center; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--border-color);">
+                            <div style="font-size: 1.3rem; font-weight: 700; color: var(--accent-purple);">${f.time_signature || 4}/4</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase;">Time Sig</div>
+                        </div>
+                    </div>
+                    ${barsHtml}
+                    <div style="text-align: right; font-size: 0.7rem; color: var(--text-muted); margin-top: 12px;">Source: ${sourceLabel}</div>
+                `;
+            } catch (err) {
+                document.getElementById('song-analysis-content').innerHTML = '<p style="color: var(--accent-red); text-align: center;">Failed to analyze track.</p>';
+            }
+        }
+
+        async function deleteInternalPlaylist(id) {
+            if (!confirm("Are you sure you want to delete this generated playlist? All tracking and versions will be lost.")) return;
+            try {
+                const res = await apiFetch(`/api/playlists/internal/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok) {
+                    alert(data.error || "Failed to delete playlist.");
+                } else {
+                    loadInternalPlaylists(); // Refresh
+                }
+            } catch (err) {
+                alert("Failed to delete playlist.");
             }
         }
     </script>

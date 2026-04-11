@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Audio-Draft2 — Discover New Artists">
+    <title>Discover — Audio-Draft2</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .page-content { max-width: 1200px; }
+
+        .discover-header { margin-bottom: 32px; }
+        .discover-header h1 { font-size: 2rem; margin-bottom: 8px; }
+        .discover-header p { color: var(--text-secondary); }
+
+        .discover-filters {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 32px;
+            padding: 20px 24px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .filter-group label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-secondary);
+        }
+
+        .filter-group select,
+        .filter-group input {
+            padding: 10px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: var(--font-family);
+            font-size: 0.875rem;
+            outline: none;
+            min-width: 160px;
+            appearance: auto;
+        }
+
+        .filter-group select:focus,
+        .filter-group input:focus {
+            border-color: var(--accent-purple);
+        }
+
+        .profile-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            background: rgba(167,139,250,0.08);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .profile-toggle:hover {
+            border-color: var(--accent-purple);
+        }
+
+        .profile-toggle.active {
+            background: rgba(167,139,250,0.15);
+            border-color: var(--accent-purple);
+        }
+
+        .profile-toggle__dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid var(--border-color);
+            transition: all 0.2s;
+        }
+
+        .profile-toggle.active .profile-toggle__dot {
+            background: var(--accent-purple);
+            border-color: var(--accent-purple);
+        }
+
+        .profile-toggle__text {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .profile-toggle.active .profile-toggle__text {
+            color: var(--accent-purple);
+        }
+
+        .artist-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 24px;
+        }
+
+        .artist-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+            transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+        }
+
+        .artist-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.3);
+            border-color: var(--accent-purple);
+        }
+
+        .artist-card__img-wrap {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background: rgba(255,255,255,0.03);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .artist-card__img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.4s ease;
+        }
+
+        .artist-card:hover .artist-card__img {
+            transform: scale(1.05);
+        }
+
+        .artist-card__img-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+            color: var(--text-muted);
+            background: linear-gradient(135deg, rgba(167,139,250,0.08), rgba(59,130,246,0.05));
+        }
+
+        .artist-card__popularity {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .artist-card__body {
+            padding: 20px;
+        }
+
+        .artist-card__name {
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-bottom: 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .artist-card__followers {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .artist-card__genres {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 16px;
+        }
+
+        .genre-chip {
+            font-size: 0.7rem;
+            padding: 3px 10px;
+            border-radius: 12px;
+            background: rgba(167,139,250,0.1);
+            color: var(--accent-purple);
+            font-weight: 500;
+        }
+
+        .artist-card__tracks {
+            border-top: 1px solid var(--border-color);
+            padding-top: 14px;
+        }
+
+        .artist-card__tracks-title {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .artist-track {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 0;
+        }
+
+        .artist-track__img {
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
+            object-fit: cover;
+            flex-shrink: 0;
+            background: rgba(255,255,255,0.05);
+        }
+
+        .artist-track__name {
+            font-size: 0.8rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+        }
+
+        .artist-card__link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 14px;
+            padding: 8px 16px;
+            background: rgba(29, 185, 84, 0.1);
+            border: 1px solid rgba(29, 185, 84, 0.3);
+            border-radius: 8px;
+            color: #1db954;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .artist-card__link:hover {
+            background: rgba(29, 185, 84, 0.2);
+            color: #1db954;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 64px 24px;
+            color: var(--text-secondary);
+            grid-column: 1 / -1;
+        }
+
+        .empty-state h3 { margin-bottom: 8px; color: var(--text-primary); }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(167,139,250,0.2);
+            border-top-color: var(--accent-purple);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="sidebar__logo">
+                <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+                    <circle cx="24" cy="24" r="22" stroke="var(--accent-purple)" stroke-width="2" />
+                    <circle cx="24" cy="24" r="10" fill="var(--accent-purple)" />
+                </svg>
+                Audio-Draft2
+            </div>
+            <nav class="sidebar__nav">
+                <a href="dashboard.html" class="sidebar__link">Dashboard</a>
+                <a href="social.html" class="sidebar__link">Social</a>
+                <a href="playlists.html" class="sidebar__link">Playlists</a>
+                <a href="discover.html" class="sidebar__link active">Discover</a>
+                <a href="analytics.html" class="sidebar__link">Analytics</a>
+                <a href="settings.html" class="sidebar__link">Settings</a>
+            </nav>
+            <div class="sidebar__footer">
+                <div class="user-info">
+                    <div class="user-avatar" id="nav-avatar">?</div>
+                    <div><div style="font-weight: 600;" id="nav-username">Loading...</div></div>
+                </div>
+                <button class="btn btn--dark" id="logout-btn" style="width: 100%; margin-top: 12px;">Sign Out</button>
+            </div>
+        </aside>
+
+        <main class="main-view">
+            <header class="topbar">
+                <div class="topbar__title">Discover</div>
+                <div class="topbar__actions">
+                    <a href="notifications.html" class="btn btn--dark">Notifications <span id="notif-badge"
+                            style="background: var(--accent-red); color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.8rem; margin-left: 4px; display: none;">0</span></a>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <div class="discover-header">
+                    <h1>🔍 Discover Artists</h1>
+                    <p>Find new artists based on genre or your listening profile.</p>
+                </div>
+
+                <div class="discover-filters">
+                    <div class="filter-group">
+                        <label for="genre-filter">Genre</label>
+                        <select id="genre-filter">
+                            <option value="pop">Pop</option>
+                            <option value="rock">Rock</option>
+                            <option value="hip-hop">Hip-Hop</option>
+                            <option value="r-n-b">R&B</option>
+                            <option value="electronic">Electronic</option>
+                            <option value="jazz">Jazz</option>
+                            <option value="classical">Classical</option>
+                            <option value="country">Country</option>
+                            <option value="latin">Latin</option>
+                            <option value="metal">Metal</option>
+                            <option value="indie">Indie</option>
+                            <option value="folk">Folk</option>
+                            <option value="blues">Blues</option>
+                            <option value="reggae">Reggae</option>
+                            <option value="soul">Soul</option>
+                        </select>
+                    </div>
+
+                    <div class="profile-toggle" id="profile-toggle">
+                        <div class="profile-toggle__dot"></div>
+                        <span class="profile-toggle__text">Based on my profile</span>
+                    </div>
+
+                    <button class="btn btn--primary" id="discover-search-btn" style="border: 1px solid var(--accent-purple); margin-left: auto;">Search Artists</button>
+                </div>
+
+                <div class="artist-grid" id="artists-container">
+                    <div class="empty-state">
+                        <h3>Select a genre and click Search</h3>
+                        <p>Or toggle "Based on my profile" to discover artists similar to ones you already love.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/main.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const toggle = document.getElementById('profile-toggle');
+            const searchBtn = document.getElementById('discover-search-btn');
+
+            toggle.addEventListener('click', () => {
+                toggle.classList.toggle('active');
+            });
+
+            searchBtn.addEventListener('click', discoverArtists);
+
+            // Auto-search on load
+            discoverArtists();
+        });
+
+        function formatFollowers(n) {
+            if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+            if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+            return n.toString();
+        }
+
+        async function discoverArtists() {
+            const container = document.getElementById('artists-container');
+            const genre = document.getElementById('genre-filter').value;
+            const basedOnProfile = document.getElementById('profile-toggle').classList.contains('active');
+            const btn = document.getElementById('discover-search-btn');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading-spinner"></span> Searching...';
+
+            container.innerHTML = '<div class="empty-state"><div class="loading-spinner" style="width: 40px; height: 40px; margin: 0 auto 16px;"></div><h3>Discovering artists...</h3></div>';
+
+            try {
+                const params = new URLSearchParams({ genre, limit: '20' });
+                if (basedOnProfile) params.set('based_on', 'profile');
+
+                const res = await apiFetch(`/api/discover/artists?${params}`);
+                const data = await res.json();
+
+                if (!res.ok) {
+                    container.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${sanitize(data.error || 'Failed to discover artists')}</p></div>`;
+                    return;
+                }
+
+                if (!data.artists || data.artists.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><h3>No artists found</h3><p>Try a different genre or enable profile-based discovery.</p></div>';
+                    return;
+                }
+
+                container.innerHTML = data.artists.map(artist => {
+                    const imgHtml = artist.image
+                        ? `<img class="artist-card__img" src="${sanitize(artist.image)}" alt="${sanitize(artist.name)}" loading="lazy">`
+                        : `<div class="artist-card__img-placeholder">🎤</div>`;
+
+                    const genreChips = (artist.genres || []).map(g =>
+                        `<span class="genre-chip">${sanitize(g)}</span>`
+                    ).join('');
+
+                    const topTracksHtml = (artist.top_tracks || []).map(t =>
+                        `<div class="artist-track">
+                            ${t.image ? `<img class="artist-track__img" src="${sanitize(t.image)}" alt="">` : `<div class="artist-track__img"></div>`}
+                            <div class="artist-track__name">${sanitize(t.name)}</div>
+                        </div>`
+                    ).join('');
+
+                    const popPct = Math.round(artist.popularity);
+
+                    return `
+                    <div class="artist-card">
+                        <div class="artist-card__img-wrap">
+                            ${imgHtml}
+                            <div class="artist-card__popularity">🔥 ${popPct}</div>
+                        </div>
+                        <div class="artist-card__body">
+                            <div class="artist-card__name">${sanitize(artist.name)}</div>
+                            <div class="artist-card__followers">${formatFollowers(artist.followers)} followers</div>
+                            <div class="artist-card__genres">${genreChips || '<span style="color: var(--text-muted); font-size: 0.75rem;">No genres listed</span>'}</div>
+                            ${topTracksHtml ? `
+                            <div class="artist-card__tracks">
+                                <div class="artist-card__tracks-title">Top Tracks</div>
+                                ${topTracksHtml}
+                            </div>` : ''}
+                            ${artist.external_url ? `<a href="${sanitize(artist.external_url)}" target="_blank" class="artist-card__link">🎧 Open in Spotify</a>` : ''}
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (err) {
+                container.innerHTML = '<div class="empty-state"><h3>Error</h3><p>Failed to load artists. Check your connection.</p></div>';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Search Artists';
+            }
+        }
+    </script>
+</body>
+
+</html>

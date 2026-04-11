@@ -299,6 +299,7 @@
                 <a href="dashboard.html" class="sidebar__link active">Dashboard</a>
                 <a href="social.html" class="sidebar__link">Social</a>
                 <a href="playlists.html" class="sidebar__link">Playlists</a>
+                <a href="discover.html" class="sidebar__link">Discover</a>
                 <a href="analytics.html" class="sidebar__link">Analytics</a>
                 <a href="settings.html" class="sidebar__link">Settings</a>
             </nav>
@@ -413,6 +414,20 @@
         </div>
     </div>
 
+    <!-- Audio Analysis Modal -->
+    <div class="modal-overlay" id="analysis-modal-overlay">
+        <div class="modal" style="max-width: 520px;">
+            <h3>🔬 Audio Feature Analysis</h3>
+            <p style="color: var(--text-secondary); font-size: 0.9rem;" id="analysis-modal-song"></p>
+            <div id="analysis-content" style="margin-top: 20px;">
+                <p style="color: var(--text-secondary); text-align: center;">Loading...</p>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn--dark" id="analysis-modal-close">Close</button>
+            </div>
+        </div>
+    </div>
+
     <script src="js/main.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
@@ -434,6 +449,10 @@
             // Generate from History button
             const histBtn = document.getElementById('btn-generate-history');
             if (histBtn) histBtn.addEventListener('click', generateFromHistory);
+
+            // Analysis modal
+            const analysisClose = document.getElementById('analysis-modal-close');
+            if (analysisClose) analysisClose.addEventListener('click', () => document.getElementById('analysis-modal-overlay').classList.remove('open'));
 
             // Mood modal
             const moodOverlay = document.getElementById('mood-modal-overlay');
@@ -501,6 +520,7 @@
                             <div class="trending-artist">${sanitize(t.artist)}</div>
                         </div>
                         <div class="trending-actions">
+                            <button class="btn--icon" onclick="openAnalysisModal('${t.id || ''}', '${sanitize(t.name).replace(/'/g, "\\'")}', '${sanitize(t.artist).replace(/'/g, "\\'")}')" title="Analyze">🔬</button>
                             <button class="btn--icon" onclick="openMoodModal('${sanitize(t.name).replace(/'/g, "\\'")}', '${sanitize(t.artist).replace(/'/g, "\\'")}')">🎭</button>
                             <button class="btn--icon" onclick="openReviewModal('${sanitize(t.name).replace(/'/g, "\\'")}', '${sanitize(t.artist).replace(/'/g, "\\'")}')">⭐</button>
                         </div>
@@ -640,6 +660,79 @@
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Submit Review';
+            }
+        }
+
+        async function openAnalysisModal(trackId, songName, artist) {
+            if (!trackId) { alert('No track ID available for analysis'); return; }
+            document.getElementById('analysis-modal-song').textContent = `${songName} — ${artist}`;
+            document.getElementById('analysis-content').innerHTML = '<p style="color: var(--text-secondary); text-align: center;"><span style="display:inline-block;width:24px;height:24px;border:3px solid rgba(167,139,250,0.2);border-top-color:var(--accent-purple);border-radius:50%;animation:spin 0.8s linear infinite;"></span> Analyzing...</p><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
+            document.getElementById('analysis-modal-overlay').classList.add('open');
+
+            try {
+                const res = await apiFetch(`/api/songs/${trackId}/audio-features`);
+                const data = await res.json();
+
+                if (!res.ok) {
+                    document.getElementById('analysis-content').innerHTML = `<p style="color: var(--accent-red); text-align: center;">${sanitize(data.error || 'Failed to analyze')}</p>`;
+                    return;
+                }
+
+                const f = data.features;
+                const keyNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+                const keyName = f.key >= 0 && f.key < 12 ? keyNames[f.key] : '?';
+                const modeName = f.mode ? 'Major' : 'Minor';
+
+                // Build radar chart using CSS with conic gradients
+                const features = [
+                    { label: 'Energy', value: f.energy, color: '#f87171' },
+                    { label: 'Danceability', value: f.danceability, color: '#a78bfa' },
+                    { label: 'Valence', value: f.valence, color: '#fbbf24' },
+                    { label: 'Acousticness', value: f.acousticness, color: '#34d399' },
+                    { label: 'Speechiness', value: f.speechiness, color: '#f472b6' },
+                    { label: 'Liveness', value: f.liveness || 0, color: '#60a5fa' },
+                    { label: 'Instrumental', value: f.instrumentalness, color: '#fb923c' }
+                ];
+
+                const barsHtml = features.map(feat => {
+                    const pct = Math.round((feat.value || 0) * 100);
+                    return `
+                    <div style="margin-bottom: 14px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                            <span style="font-size: 0.82rem; font-weight: 600;">${feat.label}</span>
+                            <span style="font-size: 0.82rem; color: var(--text-secondary);">${pct}%</span>
+                        </div>
+                        <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden;">
+                            <div style="width: ${pct}%; height: 100%; background: ${feat.color}; border-radius: 4px; transition: width 0.6s ease;"></div>
+                        </div>
+                    </div>`;
+                }).join('');
+
+                const sourceLabel = data.source === 'spotify' ? '🎵 Spotify API'
+                    : data.source === 'cache' ? '💾 Cached'
+                    : data.source === 'audio-analysis' ? '📈 Audio Analysis'
+                    : '📊 Estimated';
+
+                document.getElementById('analysis-content').innerHTML = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+                        <div style="text-align: center; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--border-color);">
+                            <div style="font-size: 1.3rem; font-weight: 700; color: var(--accent-purple);">${Math.round(f.tempo)}</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase;">BPM</div>
+                        </div>
+                        <div style="text-align: center; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--border-color);">
+                            <div style="font-size: 1.3rem; font-weight: 700; color: var(--accent-purple);">${keyName}</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase;">${modeName}</div>
+                        </div>
+                        <div style="text-align: center; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--border-color);">
+                            <div style="font-size: 1.3rem; font-weight: 700; color: var(--accent-purple);">${f.time_signature}/4</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase;">Time Sig</div>
+                        </div>
+                    </div>
+                    ${barsHtml}
+                    <div style="text-align: right; font-size: 0.7rem; color: var(--text-muted); margin-top: 12px;">Source: ${sourceLabel}</div>
+                `;
+            } catch (err) {
+                document.getElementById('analysis-content').innerHTML = '<p style="color: var(--accent-red); text-align: center;">Failed to analyze track.</p>';
             }
         }
     </script>
