@@ -1,10 +1,10 @@
 #!/bin/bash
-# Audio-Draft2 Startup Script
+# Audio-Draft Startup Script
 
 set -e
 
 echo "============================================"
-echo "  Audio-Draft2 — Starting Up"
+echo "  Audio-Draft — Starting Up"
 echo "============================================"
 
 # Check for Node.js
@@ -27,7 +27,7 @@ npm install
 
 # Start the server
 echo ""
-echo "Starting Audio-Draft2 server..."
+echo "Starting Audio-Draft server..."
 echo "Open http://localhost:3000 in your browser"
 echo "============================================"
 node server.js

@@ -2,7 +2,7 @@
 setlocal
 
 echo ===========================================
-echo    Starting Audio-Draft2 Setup ^& Launch
+echo    Starting Audio-Draft Setup ^& Launch
 echo ===========================================
 
 REM Check for Node.js
@@ -41,7 +41,7 @@ REM Wait a moment for the server to spin up
 timeout /t 3 /nobreak >nul
 
 echo =========================================
-echo    Launching Audio-Draft2 Desktop App
+echo    Launching Audio-Draft Desktop App
 echo =========================================
 echo Launching...
 

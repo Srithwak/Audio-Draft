@@ -1,6 +1,6 @@
-# Audio-Draft2 🎵
+# Audio-Draft 🎵
 
-Audio-Draft2 is an exploratory music application designed to let users manage their music experiences, collaborate on playlists, review songs, and personalize their listening environment.
+Audio-Draft is an exploratory music application designed to let users manage their music experiences, collaborate on playlists, review songs, and personalize their listening environment.
 
 ## 🚀 Features
 
@@ -41,7 +41,7 @@ To test the application on your computer:
    ```bash
    npm run build
    ```
-   *The distributable executable will be saved in the `release/Audio-Draft2-win32-x64/` directory. You can run the `Audio-Draft2.exe` directly from there.*
+   *The distributable executable will be saved in the `release/Audio-Draft-win32-x64/` directory. You can run the `Audio-Draft.exe` directly from there.*
 
 ---
-*Created as part of the Audio-Draft2 Software Engineering phase implementations.*
+*Created as part of the Audio-Draft Software Engineering phase implementations.*

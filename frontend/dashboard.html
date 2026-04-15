@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Audio-Draft2 — Dashboard">
-    <title>Dashboard — Audio-Draft2</title>
+    <meta name="description" content="Audio-Draft — Dashboard">
+    <title>Dashboard — Audio-Draft</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -273,6 +273,105 @@
         .star-rating .star.active { color: #fbbf24; }
         .star-rating .star:hover { color: #fbbf24; }
 
+        /* Song Info Modal */
+        .song-info-section { margin-bottom: 24px; }
+        .song-info-section h4 {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .info-avg-rating {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 18px;
+            background: linear-gradient(135deg, rgba(251,191,36,0.08), rgba(251,191,36,0.02));
+            border: 1px solid rgba(251,191,36,0.2);
+            border-radius: 12px;
+            margin-bottom: 14px;
+        }
+        .info-avg-rating__value {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #fbbf24;
+            line-height: 1;
+        }
+        .info-avg-rating__stars {
+            color: #fbbf24;
+            font-size: 1.1rem;
+            letter-spacing: 2px;
+        }
+        .info-avg-rating__count {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+        }
+        .info-review-item {
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            margin-bottom: 8px;
+            animation: fadeIn 0.3s ease-out;
+        }
+        .info-review-item__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .info-review-item__user {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--accent-purple);
+        }
+        .info-review-item__date {
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+        }
+        .info-review-item__stars {
+            color: #fbbf24;
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+        }
+        .info-review-item__text {
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            line-height: 1.5;
+            margin-top: 6px;
+        }
+        .info-mood-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .info-mood-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            background: rgba(167,139,250,0.12);
+            border: 1px solid rgba(167,139,250,0.25);
+            color: var(--accent-purple);
+            animation: fadeIn 0.3s ease-out;
+        }
+        .info-empty {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            background: rgba(255,255,255,0.02);
+            border-radius: 10px;
+            border: 1px dashed var(--border-color);
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -293,7 +392,7 @@
                     <circle cx="24" cy="24" r="22" stroke="var(--accent-purple)" stroke-width="2" />
                     <circle cx="24" cy="24" r="10" fill="var(--accent-purple)" />
                 </svg>
-                Audio-Draft2
+                Audio-Draft
             </div>
             <nav class="sidebar__nav">
                 <a href="dashboard.html" class="sidebar__link active">Dashboard</a>
@@ -414,6 +513,20 @@
         </div>
     </div>
 
+    <!-- Song Info Modal -->
+    <div class="modal-overlay" id="info-modal-overlay">
+        <div class="modal" style="max-width: 540px; max-height: 80vh; overflow-y: auto;">
+            <h3>📋 Song Info</h3>
+            <p style="color: var(--text-secondary); font-size: 0.9rem;" id="info-modal-song"></p>
+            <div id="info-content" style="margin-top: 20px;">
+                <p style="color: var(--text-secondary); text-align: center;">Loading...</p>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn--dark" id="info-modal-close">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Audio Analysis Modal -->
     <div class="modal-overlay" id="analysis-modal-overlay">
         <div class="modal" style="max-width: 520px;">
@@ -449,6 +562,10 @@
             // Generate from History button
             const histBtn = document.getElementById('btn-generate-history');
             if (histBtn) histBtn.addEventListener('click', generateFromHistory);
+
+            // Info modal
+            const infoClose = document.getElementById('info-modal-close');
+            if (infoClose) infoClose.addEventListener('click', () => document.getElementById('info-modal-overlay').classList.remove('open'));
 
             // Analysis modal
             const analysisClose = document.getElementById('analysis-modal-close');
@@ -520,6 +637,7 @@
                             <div class="trending-artist">${sanitize(t.artist)}</div>
                         </div>
                         <div class="trending-actions">
+                            <button class="btn--icon" onclick="viewSongInfo('${sanitize(t.name).replace(/'/g, "\\'")}', '${sanitize(t.artist).replace(/'/g, "\\'")}')" title="View ratings & moods">📋</button>
                             <button class="btn--icon" onclick="openAnalysisModal('${t.id || ''}', '${sanitize(t.name).replace(/'/g, "\\'")}', '${sanitize(t.artist).replace(/'/g, "\\'")}')" title="Analyze">🔬</button>
                             <button class="btn--icon" onclick="openMoodModal('${sanitize(t.name).replace(/'/g, "\\'")}', '${sanitize(t.artist).replace(/'/g, "\\'")}')">🎭</button>
                             <button class="btn--icon" onclick="openReviewModal('${sanitize(t.name).replace(/'/g, "\\'")}', '${sanitize(t.artist).replace(/'/g, "\\'")}')">⭐</button>
@@ -660,6 +778,90 @@
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Submit Review';
+            }
+        }
+
+        async function viewSongInfo(songName, artist) {
+            document.getElementById('info-modal-song').textContent = `${songName} — ${artist}`;
+            document.getElementById('info-content').innerHTML = '<p style="color: var(--text-secondary); text-align: center;"><span style="display:inline-block;width:24px;height:24px;border:3px solid rgba(167,139,250,0.2);border-top-color:var(--accent-purple);border-radius:50%;animation:spin 0.8s linear infinite;"></span> Loading...</p><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
+            document.getElementById('info-modal-overlay').classList.add('open');
+
+            try {
+                const [reviewsRes, moodsRes] = await Promise.all([
+                    apiFetch(`/api/songs/reviews/${encodeURIComponent(songName)}`),
+                    apiFetch(`/api/songs/mood/${encodeURIComponent(songName)}`)
+                ]);
+
+                const reviewsData = await reviewsRes.json();
+                const moodsData = await moodsRes.json();
+
+                const reviews = reviewsData.reviews || [];
+                const avgRating = reviewsData.average_rating;
+                const moods = moodsData.moods || [];
+
+                let html = '';
+
+                // --- Ratings & Reviews Section ---
+                html += '<div class="song-info-section">';
+                html += '<h4>⭐ Ratings & Reviews</h4>';
+
+                if (reviews.length > 0) {
+                    // Average rating card
+                    const fullStars = Math.floor(avgRating);
+                    const halfStar = avgRating - fullStars >= 0.5;
+                    let starsHtml = '';
+                    for (let i = 0; i < 5; i++) {
+                        if (i < fullStars) starsHtml += '★';
+                        else if (i === fullStars && halfStar) starsHtml += '★';
+                        else starsHtml += '☆';
+                    }
+
+                    html += `<div class="info-avg-rating">
+                        <div class="info-avg-rating__value">${avgRating}</div>
+                        <div>
+                            <div class="info-avg-rating__stars">${starsHtml}</div>
+                            <div class="info-avg-rating__count">${reviews.length} review${reviews.length !== 1 ? 's' : ''}</div>
+                        </div>
+                    </div>`;
+
+                    // Individual reviews
+                    reviews.forEach(r => {
+                        const rStars = '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating);
+                        const date = new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                        html += `<div class="info-review-item">
+                            <div class="info-review-item__header">
+                                <span class="info-review-item__user">${sanitize(r.username)}</span>
+                                <span class="info-review-item__date">${date}</span>
+                            </div>
+                            <div class="info-review-item__stars">${rStars}</div>
+                            ${r.review_text ? `<div class="info-review-item__text">${sanitize(r.review_text)}</div>` : ''}
+                        </div>`;
+                    });
+                } else {
+                    html += '<div class="info-empty">No reviews yet. Be the first to rate this song! ⭐</div>';
+                }
+                html += '</div>';
+
+                // --- Mood Tags Section ---
+                html += '<div class="song-info-section">';
+                html += '<h4>🎭 Mood Tags</h4>';
+
+                if (moods.length > 0) {
+                    const moodEmojis = { 'Happy': '😊', 'Sad': '😢', 'Energetic': '⚡', 'Calm': '🧘', 'Romantic': '❤️', 'Angry': '😤', 'Focus': '🎯', 'Chill': '🌊' };
+                    html += '<div class="info-mood-tags">';
+                    moods.forEach(m => {
+                        const emoji = moodEmojis[m.label] || '🏷️';
+                        html += `<span class="info-mood-tag">${emoji} ${sanitize(m.label)}</span>`;
+                    });
+                    html += '</div>';
+                } else {
+                    html += '<div class="info-empty">No mood tags yet. Tag this song with a mood! 🎭</div>';
+                }
+                html += '</div>';
+
+                document.getElementById('info-content').innerHTML = html;
+            } catch (err) {
+                document.getElementById('info-content').innerHTML = '<p style="color: var(--accent-red); text-align: center;">Failed to load song info.</p>';
             }
         }
 

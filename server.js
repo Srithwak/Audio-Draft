@@ -1402,7 +1402,7 @@ app.post('/api/playlists/:id/export', authenticateUser, async (req, res) => {
             `https://api.spotify.com/v1/users/${spotifyUserId}/playlists`,
             {
                 name: playlist.name,
-                description: playlist.description || 'Exported from Audio-Draft2',
+                description: playlist.description || 'Exported from Audio-Draft',
                 public: false
             },
             { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } }

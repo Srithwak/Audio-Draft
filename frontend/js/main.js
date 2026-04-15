@@ -1,5 +1,5 @@
 /**
- * Audio-Draft2 — Client-Side Utilities
+ * Audio-Draft — Client-Side Utilities
  */
 
 // --- XSS Protection ---
