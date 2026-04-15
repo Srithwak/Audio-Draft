@@ -1,7 +1,0 @@
-token_ok
-direct_api_fail
-status_404
-msg_Resource not found
-server_fail
-srv_status_undefined
-srv_msg_unknown

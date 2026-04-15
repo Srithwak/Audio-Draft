@@ -96,10 +96,7 @@
             margin-bottom: 4px;
         }
 
-        .playlist-card__meta {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-        }
+
 
         .track-panel__actions {
             display: flex;
@@ -591,11 +588,29 @@
             });
             document.getElementById('rename-modal-save').addEventListener('click', renamePlaylist);
 
+            // Handle Enter key in rename input
+            document.getElementById('rename-input').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    renamePlaylist();
+                }
+            });
+
             // Invite modal
             document.getElementById('invite-modal-cancel').addEventListener('click', () => {
                 document.getElementById('invite-modal-overlay').classList.remove('open');
             });
             document.getElementById('invite-modal-send').addEventListener('click', sendInvite);
+
+            // Handle Enter key in invite input
+            document.getElementById('invite-input').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    sendInvite();
+                }
+            });
 
             // Versions modal
             document.getElementById('versions-modal-close').addEventListener('click', () => {
@@ -638,17 +653,12 @@
 
                 container.innerHTML = allSpotifyPlaylists.map(pl => {
                     const safeName = escapeForAttr(pl.name);
-                    const safeOwner = sanitize(pl.owner || 'Unknown');
                     const imgHtml = pl.image
                         ? `<img class="playlist-card__img" src="${pl.image}" alt="${safeName}">`
                         : `<div class="playlist-card__img" style="display: flex; align-items: center; justify-content: center; font-size: 2rem; color: var(--text-secondary);">🎵</div>`;
                     return `
                     <div class="playlist-card" data-id="${pl.id}" data-name="${safeName}">
                         ${imgHtml}
-                        <div class="playlist-card__body">
-                            <div class="playlist-card__title">${sanitize(pl.name)}</div>
-                            <div class="playlist-card__meta">${pl.track_count || 0} tracks · ${safeOwner}</div>
-                        </div>
                     </div>`;
                 }).join('');
 

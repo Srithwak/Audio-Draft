@@ -2,5 +2,24 @@ node_modules/
 dist/
 dist_app/
 release/
-
 *.log
+
+# Environment files with secrets
+database/.env
+
+# Temp media files
+*.webm
+temp_audio.*
+
+# Test scripts and output
+test_scripts/
+test_*
+results.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

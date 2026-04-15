@@ -10,11 +10,26 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
-    "axios": "^1.8.4",
+    "audio-decode": "^3.9.0",
+    "axios": "^1.15.0",
     "bcryptjs": "^2.4.3",
     "dotenv": "^16.4.7",
     "electron": "^31.0.0",
     "express": "^4.21.2",
-    "open": "^11.0.0"
-  }
+    "music-tempo": "^1.0.3",
+    "open": "^11.0.0",
+    "youtube-dl-exec": "^3.1.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Srithwak/Audio-Draft.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Srithwak/Audio-Draft/issues"
+  },
+  "homepage": "https://github.com/Srithwak/Audio-Draft#readme"
 }
