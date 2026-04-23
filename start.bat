@@ -15,13 +15,32 @@ if %ERRORLEVEL% neq 0 (
 
 REM Check for .env file in database folder
 if not exist "database\.env" (
-    if exist "database\.env.example" (
-        echo WARNING: database\.env not found. Copying from .env.example...
-        copy "database\.env.example" "database\.env" >nul
-        echo Please edit database\.env with your credentials.
-    ) else (
-        echo WARNING: database\.env and database\.env.example not found.
-    )
+    echo ===========================================
+    echo   INITIAL SETUP REQUIRED
+    echo ===========================================
+    echo Audio-Draft requires Supabase and Spotify to function.
+    echo Please follow the README instructions to create these accounts.
+    echo.
+    set /p SUPA_URL="Enter Supabase Project URL: "
+    set /p SUPA_ANON="Enter Supabase Anon Key: "
+    set /p SUPA_DB="Enter Supabase Direct Connection String: "
+    echo.
+    set /p SPOT_ID="Enter Spotify Client ID: "
+    set /p SPOT_SEC="Enter Spotify Client Secret: "
+    
+    (
+    echo API_URL="%SUPA_URL%"
+    echo ANON_PUBLIC_KEY="%SUPA_ANON%"
+    echo SUPABASE_DIRECT_CONNECT="%SUPA_DB%"
+    echo SPOTIFY_CLIENT_ID="%SPOT_ID%"
+    echo SPOTIFY_CLIENT_SECRET="%SPOT_SEC%"
+    ) > "database\.env"
+    
+    echo.
+    echo Credentials saved to database\.env!
+    echo Reminder: Make sure you run database\initialize_db.sql in your Supabase SQL Editor!
+) else (
+    echo database\.env found. Skipping initial setup.
 )
 
 REM Install dependencies
