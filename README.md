@@ -42,6 +42,7 @@ This installs all required packages including Express, Supabase client, Electron
 
 ## Step 3 — Spotify Developer Setup
 
+To use this app, you need a Spotify premium account.
 You need to create a Spotify App to get your API credentials.
 
 1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and log in.
@@ -50,7 +51,7 @@ You need to create a Spotify App to get your API credentials.
    - **App name**: anything (e.g. `Audio-Draft`)
    - **App description**: anything
    - **Redirect URI**: `http://127.0.0.1:3000/spotify/callback`  
-     ⚠️ This must be **exact** — no trailing slash, no `localhost`.
+      This must be **exact** — no trailing slash, no `localhost`.
 4. Check the **Web API** box under "Which API/SDKs are you planning to use?", then click **Save**.
 5. Once the app is created, open it and go to **Settings**.
 6. Copy your **Client ID** and **Client Secret** — you'll need these in the next step.

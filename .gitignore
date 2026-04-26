@@ -5,7 +5,10 @@ release/
 *.log
 
 # Environment files with secrets
-# database/.env
+database/.env
+.env
+.env.*
+!.env.example
 
 # Temp media files
 *.webm
